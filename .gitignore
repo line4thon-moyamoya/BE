@@ -1,0 +1,16 @@
+.gradle/
+build/
+out/
+
+.idea/
+*.iml
+.vscode/
+
+.env
+.env.*
+src/main/resources/application-local.yml
+
+*.log
+.DS_Store
+Thumbs.db
+
