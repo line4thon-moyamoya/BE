@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$"
+            "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
     );
     private static final Pattern PARENT_PIN_PATTERN = Pattern.compile("^\\d{4}$");
 
@@ -217,9 +217,12 @@ public class AuthService {
                 || isBlank(request.parentPin())
                 || request.child() == null
                 || isBlank(request.child().nickname())
-                || request.consents() == null
-                || request.consents().isEmpty()) {
+                || request.consents() == null) {
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+        }
+
+        if (request.consents().isEmpty()) {
+            throw new CustomException(ConsentErrorCode.REQUIRED_CONSENT_NOT_AGREED);
         }
     }
 

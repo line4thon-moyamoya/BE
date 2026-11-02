@@ -181,6 +181,40 @@ class AuthServiceTest {
     }
 
     @Test
+    void signupReturnsConsent400ForEmptyConsentList() {
+        SignupRequest request = new SignupRequest(
+                "jiwoo.mom@email.com",
+                "password123!",
+                "1234",
+                new ChildSignupRequest("지우", "AGE_3_4"),
+                List.of()
+        );
+
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(ConsentErrorCode.REQUIRED_CONSENT_NOT_AGREED);
+
+        verify(consentRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void signupReturnsAuth400WhenConsentFieldIsMissing() {
+        SignupRequest request = new SignupRequest(
+                "jiwoo.mom@email.com",
+                "password123!",
+                "1234",
+                new ChildSignupRequest("지우", "AGE_3_4"),
+                null
+        );
+
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+    }
+
+    @Test
     void signupRejectsInvalidAgeGroup() {
         SignupRequest request = new SignupRequest(
                 "jiwoo.mom@email.com",
