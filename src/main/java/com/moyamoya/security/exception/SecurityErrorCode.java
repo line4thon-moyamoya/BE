@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum SecurityErrorCode implements BaseErrorCode {
 
-    AUTHENTICATION_REQUIRED("AUTH401", "인증이 필요합니다.", HttpStatus.UNAUTHORIZED),
+    AUTHENTICATION_REQUIRED("AUTH401", "로그인이 필요한 요청입니다.", HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED("AUTH403", "접근 권한이 없습니다.", HttpStatus.FORBIDDEN);
 
     private final String code;

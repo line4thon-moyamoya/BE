@@ -2,10 +2,13 @@ package com.moyamoya.domain.auth.service;
 
 import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
+import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
+import com.moyamoya.domain.auth.exception.ParentPinErrorCode;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.exception.ChildErrorCode;
@@ -22,6 +25,7 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.security.IssuedTokens;
 import com.moyamoya.security.JwtTokenProvider;
 import com.moyamoya.security.TokenHasher;
+import com.moyamoya.security.exception.SecurityErrorCode;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,6 +55,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenHasher tokenHasher;
+    private final ParentPinAttemptLimiter parentPinAttemptLimiter;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -121,6 +126,31 @@ public class AuthService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public ParentPinVerifyResponse verifyParentPin(
+            Long userId,
+            ParentPinVerifyRequest request
+    ) {
+        validateParentPinRequest(request);
+
+        if (parentPinAttemptLimiter.isBlocked(userId)) {
+            throw new CustomException(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(SecurityErrorCode.AUTHENTICATION_REQUIRED));
+
+        if (!passwordEncoder.matches(request.parentPin(), user.getParentPin())) {
+            if (parentPinAttemptLimiter.recordFailure(userId)) {
+                throw new CustomException(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
+            }
+            throw new CustomException(ParentPinErrorCode.PARENT_PIN_MISMATCH);
+        }
+
+        parentPinAttemptLimiter.reset(userId);
+        return new ParentPinVerifyResponse(jwtTokenProvider.issueParentModeToken(userId));
+    }
+
     private Long resolveSelectedChildId(User user) {
         if (user.getLastSelectedChildId() != null) {
             return user.getLastSelectedChildId();
@@ -162,6 +192,16 @@ public class AuthService {
     private void validateLoginRequest(LoginRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
             throw new CustomException(AuthErrorCode.MISSING_LOGIN_CREDENTIALS);
+        }
+    }
+
+    private void validateParentPinRequest(ParentPinVerifyRequest request) {
+        if (request == null || isBlank(request.parentPin())) {
+            throw new CustomException(ParentPinErrorCode.PARENT_PIN_REQUIRED);
+        }
+
+        if (!PARENT_PIN_PATTERN.matcher(request.parentPin()).matches()) {
+            throw new CustomException(ParentPinErrorCode.INVALID_PARENT_PIN_FORMAT);
         }
     }
 

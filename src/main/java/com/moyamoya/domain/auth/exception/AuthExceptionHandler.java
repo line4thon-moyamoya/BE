@@ -2,6 +2,7 @@ package com.moyamoya.domain.auth.exception;
 
 import com.moyamoya.domain.auth.controller.AuthController;
 import com.moyamoya.global.common.BaseResponse;
+import com.moyamoya.global.exception.model.BaseErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -18,9 +19,14 @@ public class AuthExceptionHandler {
     public ResponseEntity<BaseResponse<Void>> handleHttpMessageNotReadableException(
             HttpServletRequest request
     ) {
-        AuthErrorCode errorCode = request.getRequestURI().endsWith("/login")
-                ? AuthErrorCode.MISSING_LOGIN_CREDENTIALS
-                : AuthErrorCode.INVALID_SIGNUP_REQUEST;
+        BaseErrorCode errorCode;
+        if (request.getRequestURI().endsWith("/login")) {
+            errorCode = AuthErrorCode.MISSING_LOGIN_CREDENTIALS;
+        } else if (request.getRequestURI().endsWith("/parent-pin/verify")) {
+            errorCode = ParentPinErrorCode.PARENT_PIN_REQUIRED;
+        } else {
+            errorCode = AuthErrorCode.INVALID_SIGNUP_REQUEST;
+        }
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())

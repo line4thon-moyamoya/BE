@@ -10,11 +10,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.auth.dto.request.ChildSignupRequest;
 import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
+import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.auth.exception.AuthExceptionHandler;
+import com.moyamoya.domain.auth.exception.ParentPinErrorCode;
 import com.moyamoya.domain.auth.service.AuthService;
 import com.moyamoya.domain.consent.exception.ConsentErrorCode;
 import com.moyamoya.global.exception.CustomException;
@@ -156,6 +159,58 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("AUTH400"))
                 .andExpect(jsonPath("$.message").value("이메일과 비밀번호를 모두 입력해 주세요."));
+    }
+
+    @Test
+    void verifyParentPinReturnsExpectedResponse() throws Exception {
+        ParentPinVerifyResponse response = new ParentPinVerifyResponse("parent-mode-token");
+        when(authService.verifyParentPin(any(), any(ParentPinVerifyRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/parent-pin/verify")
+                        .principal(() -> "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentPin": "1234"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("보호자 인증에 성공했습니다."))
+                .andExpect(jsonPath("$.data.parentModeToken").value("parent-mode-token"));
+    }
+
+    @Test
+    void verifyParentPinReturnsParentPin403ForMismatch() throws Exception {
+        when(authService.verifyParentPin(any(), any(ParentPinVerifyRequest.class)))
+                .thenThrow(new CustomException(ParentPinErrorCode.PARENT_PIN_MISMATCH));
+
+        mockMvc.perform(post("/api/v1/auth/parent-pin/verify")
+                        .principal(() -> "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentPin": "9999"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("PARENT_PIN403"))
+                .andExpect(jsonPath("$.message").value("보호자 비밀번호가 올바르지 않습니다."));
+    }
+
+    @Test
+    void verifyParentPinReturnsSpecificErrorForMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/parent-pin/verify")
+                        .principal(() -> "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentPin\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("PARENT_PIN400"))
+                .andExpect(jsonPath("$.message").value("보호자 비밀번호를 입력해 주세요."));
     }
 
     private SignupRequest validRequest() {

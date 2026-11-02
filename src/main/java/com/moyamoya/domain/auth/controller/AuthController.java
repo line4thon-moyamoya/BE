@@ -1,8 +1,10 @@
 package com.moyamoya.domain.auth.controller;
 
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
+import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.service.AuthService;
 import com.moyamoya.global.common.BaseResponse;
@@ -12,7 +14,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.security.Principal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -169,6 +173,61 @@ public class AuthController {
               "data": null
             }
             """;
+    private static final String PARENT_PIN_REQUEST_EXAMPLE = """
+            {
+              "parentPin": "1234"
+            }
+            """;
+    private static final String PARENT_PIN_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "보호자 인증에 성공했습니다.",
+              "data": {
+                "parentModeToken": "eyJhbGciOiJIUzI1NiJ9..."
+              }
+            }
+            """;
+    private static final String PARENT_PIN_REQUIRED_EXAMPLE = """
+            {
+              "success": false,
+              "code": "PARENT_PIN400",
+              "message": "보호자 비밀번호를 입력해 주세요.",
+              "data": null
+            }
+            """;
+    private static final String INVALID_PARENT_PIN_FORMAT_EXAMPLE = """
+            {
+              "success": false,
+              "code": "PARENT_PIN400_INVALID_FORMAT",
+              "message": "보호자 비밀번호는 숫자 4자리로 입력해 주세요.",
+              "data": null
+            }
+            """;
+    private static final String AUTHENTICATION_REQUIRED_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401",
+              "message": "로그인이 필요한 요청입니다.",
+              "data": null
+            }
+            """;
+    private static final String PARENT_PIN_MISMATCH_EXAMPLE = """
+            {
+              "success": false,
+              "code": "PARENT_PIN403",
+              "message": "보호자 비밀번호가 올바르지 않습니다.",
+              "data": null
+            }
+            """;
+    private static final String TOO_MANY_PARENT_PIN_ATTEMPTS_EXAMPLE = """
+            {
+              "success": false,
+              "code": "PARENT_PIN429",
+              "message": "잠시 후 다시 시도해 주세요.",
+              "data": null
+            }
+            """;
 
     private final AuthService authService;
 
@@ -311,5 +370,93 @@ public class AuthController {
     ) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(BaseResponse.success(LOGIN_SUCCESS_MESSAGE, response));
+    }
+
+    @Operation(
+            summary = "보호자 PIN 인증",
+            description = "Access Token으로 로그인 사용자를 확인하고 숫자 4자리 보호자 PIN을 검증합니다. "
+                    + "성공 시 보호자 모드 API에 사용하는 단기 토큰을 발급합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "보호자 인증 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = PARENT_PIN_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "PIN 누락 또는 형식 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "PIN 누락", value = PARENT_PIN_REQUIRED_EXAMPLE),
+                                    @ExampleObject(
+                                            name = "PIN 형식 오류",
+                                            value = INVALID_PARENT_PIN_FORMAT_EXAMPLE
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Access Token 누락 또는 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = AUTHENTICATION_REQUIRED_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "보호자 PIN 불일치",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = PARENT_PIN_MISMATCH_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "429",
+                    description = "보호자 PIN 반복 실패",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = TOO_MANY_PARENT_PIN_ATTEMPTS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)
+                    )
+            )
+    })
+    @PostMapping("/parent-pin/verify")
+    public ResponseEntity<BaseResponse<ParentPinVerifyResponse>> verifyParentPin(
+            Principal principal,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ParentPinVerifyRequest.class),
+                            examples = @ExampleObject(value = PARENT_PIN_REQUEST_EXAMPLE)
+                    )
+            )
+            @RequestBody ParentPinVerifyRequest request
+    ) {
+        ParentPinVerifyResponse response = authService.verifyParentPin(
+                Long.valueOf(principal.getName()),
+                request
+        );
+        return ResponseEntity.ok(BaseResponse.success("보호자 인증에 성공했습니다.", response));
     }
 }

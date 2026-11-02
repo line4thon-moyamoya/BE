@@ -1,5 +1,7 @@
 package com.moyamoya.security;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -16,6 +18,7 @@ public class JwtTokenProvider {
     private static final String TOKEN_TYPE_CLAIM = "tokenType";
     private static final String ACCESS_TOKEN_TYPE = "ACCESS";
     private static final String REFRESH_TOKEN_TYPE = "REFRESH";
+    private static final String PARENT_MODE_TOKEN_TYPE = "PARENT_MODE";
 
     private final JwtProperties properties;
     private final Clock clock;
@@ -39,6 +42,24 @@ public class JwtTokenProvider {
         );
     }
 
+    public String issueParentModeToken(Long userId) {
+        return createToken(
+                userId,
+                PARENT_MODE_TOKEN_TYPE,
+                properties.parentModeTokenExpirationMs()
+        );
+    }
+
+    public Long getUserIdFromAccessToken(String token) {
+        Claims claims = parseClaims(token);
+        String tokenType = claims.get(TOKEN_TYPE_CLAIM, String.class);
+        if (!ACCESS_TOKEN_TYPE.equals(tokenType)) {
+            throw new JwtException("Access Token이 아닙니다.");
+        }
+
+        return Long.valueOf(claims.getSubject());
+    }
+
     private String createToken(Long userId, String tokenType, long expirationMs) {
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plusMillis(expirationMs);
@@ -50,5 +71,13 @@ public class JwtTokenProvider {
                 .expiration(Date.from(expiresAt))
                 .signWith(signingKey)
                 .compact();
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(signingKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }
