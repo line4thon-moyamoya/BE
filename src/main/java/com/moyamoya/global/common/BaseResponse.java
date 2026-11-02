@@ -19,6 +19,10 @@ public class BaseResponse<T> {
         return new BaseResponse<>(true, 200, SUCCESS_MESSAGE, data);
     }
 
+    public static <T> BaseResponse<T> success(String message, T data) {
+        return new BaseResponse<>(true, 200, message, data);
+    }
+
     public static BaseResponse<Void> error(String code, String message) {
         return new BaseResponse<>(false, code, message, null);
     }

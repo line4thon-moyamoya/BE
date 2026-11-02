@@ -8,6 +8,8 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    base_branches:
+      - "develop"
 
   path_filters:
     - "!**/*.md"

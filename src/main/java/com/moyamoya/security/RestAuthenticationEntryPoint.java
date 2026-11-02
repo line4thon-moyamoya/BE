@@ -25,7 +25,9 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authenticationException
     ) throws IOException {
-        SecurityErrorCode errorCode = SecurityErrorCode.AUTHENTICATION_REQUIRED;
+        SecurityErrorCode errorCode = request.getRequestURI().endsWith("/logout")
+                ? SecurityErrorCode.INVALID_ACCESS_TOKEN
+                : SecurityErrorCode.AUTHENTICATION_REQUIRED;
 
         response.setStatus(errorCode.getHttpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
