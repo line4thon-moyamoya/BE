@@ -172,7 +172,12 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "보호자 회원가입")
+    @Operation(
+            summary = "보호자 회원가입",
+            description = "1-5 보호자 비밀번호 만들기를 완료한 뒤 한 번 호출합니다. "
+                    + "보호자 계정, 아이 프로필, 동의 내역을 함께 저장하고 인증 토큰을 발급합니다. "
+                    + "필수 약관 4개는 모두 동의해야 합니다."
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
@@ -242,7 +247,12 @@ public class AuthController {
         return ResponseEntity.ok(BaseResponse.success(SIGNUP_SUCCESS_MESSAGE, response));
     }
 
-    @Operation(summary = "보호자 로그인")
+    @Operation(
+            summary = "보호자 로그인",
+            description = "가입한 이메일과 비밀번호로 로그인합니다. "
+                    + "성공 시 인증 토큰과 현재 선택된 아이 ID를 반환합니다. "
+                    + "선택 이력이 없으면 가장 먼저 등록한 아이가 선택됩니다."
+    )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
