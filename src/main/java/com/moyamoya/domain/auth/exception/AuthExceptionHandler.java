@@ -2,6 +2,7 @@ package com.moyamoya.domain.auth.exception;
 
 import com.moyamoya.domain.auth.controller.AuthController;
 import com.moyamoya.global.common.BaseResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
@@ -14,12 +15,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class AuthExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<BaseResponse<Void>> handleHttpMessageNotReadableException() {
+    public ResponseEntity<BaseResponse<Void>> handleHttpMessageNotReadableException(
+            HttpServletRequest request
+    ) {
+        AuthErrorCode errorCode = request.getRequestURI().endsWith("/login")
+                ? AuthErrorCode.MISSING_LOGIN_CREDENTIALS
+                : AuthErrorCode.INVALID_SIGNUP_REQUEST;
+
         return ResponseEntity
-                .status(AuthErrorCode.INVALID_SIGNUP_REQUEST.getHttpStatus())
+                .status(errorCode.getHttpStatus())
                 .body(BaseResponse.error(
-                        AuthErrorCode.INVALID_SIGNUP_REQUEST.getCode(),
-                        AuthErrorCode.INVALID_SIGNUP_REQUEST.getMessage()
+                        errorCode.getCode(),
+                        errorCode.getMessage()
                 ));
     }
 }

@@ -13,7 +13,9 @@ import static org.mockito.Mockito.when;
 
 import com.moyamoya.domain.auth.dto.request.ChildSignupRequest;
 import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
+import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.child.entity.Child;
@@ -32,6 +34,7 @@ import com.moyamoya.security.JwtTokenProvider;
 import com.moyamoya.security.TokenHasher;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -102,6 +105,7 @@ class AuthServiceTest {
         assertThat(response.accessToken()).isEqualTo("access-token");
         assertThat(response.refreshToken()).isEqualTo("refresh-token");
         verify(consentRecordRepository).saveAll(anyList());
+        verify(savedUser).updateLastSelectedChildId(2L);
         verify(savedUser).updateRefreshToken("refresh-token-hash");
     }
 
@@ -179,6 +183,101 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ChildErrorCode.INVALID_AGE_GROUP);
+    }
+
+    @Test
+    void loginAuthenticatesPasswordAndRotatesRefreshToken() {
+        LoginRequest request = new LoginRequest("JIWOO.MOM@EMAIL.COM", "password123!");
+        User user = mock(User.class);
+        when(userRepository.findByEmail("jiwoo.mom@email.com")).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1L);
+        when(user.getLastSelectedChildId()).thenReturn(2L);
+        when(user.getPassword()).thenReturn("encoded-password");
+        when(passwordEncoder.matches("password123!", "encoded-password")).thenReturn(true);
+        when(jwtTokenProvider.issueTokens(1L))
+                .thenReturn(new IssuedTokens("access-token", "refresh-token"));
+        when(tokenHasher.hash("refresh-token")).thenReturn("refresh-token-hash");
+
+        LoginResponse response = authService.login(request);
+
+        assertThat(response.userId()).isEqualTo(1L);
+        assertThat(response.selectedChildId()).isEqualTo(2L);
+        assertThat(response.accessToken()).isEqualTo("access-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        verify(user).updateRefreshToken("refresh-token-hash");
+    }
+
+    @Test
+    void loginSelectsFirstChildWhenThereIsNoSelectionHistory() {
+        LoginRequest request = new LoginRequest("jiwoo.mom@email.com", "password123!");
+        User user = mock(User.class);
+        Child firstChild = mock(Child.class);
+        when(userRepository.findByEmail("jiwoo.mom@email.com")).thenReturn(Optional.of(user));
+        when(user.getId()).thenReturn(1L);
+        when(user.getPassword()).thenReturn("encoded-password");
+        when(user.getLastSelectedChildId()).thenReturn(null);
+        when(passwordEncoder.matches("password123!", "encoded-password")).thenReturn(true);
+        when(childRepository.findFirstByUserOrderByIdAsc(user)).thenReturn(Optional.of(firstChild));
+        when(firstChild.getId()).thenReturn(3L);
+        when(jwtTokenProvider.issueTokens(1L))
+                .thenReturn(new IssuedTokens("access-token", "refresh-token"));
+        when(tokenHasher.hash("refresh-token")).thenReturn("refresh-token-hash");
+
+        LoginResponse response = authService.login(request);
+
+        assertThat(response.selectedChildId()).isEqualTo(3L);
+        verify(user).updateLastSelectedChildId(3L);
+    }
+
+    @Test
+    void loginRejectsMissingEmailOrPassword() {
+        LoginRequest request = new LoginRequest("", "password123!");
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.MISSING_LOGIN_CREDENTIALS);
+
+        verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void loginRejectsInvalidEmailFormat() {
+        LoginRequest request = new LoginRequest("invalid-email", "password123!");
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_EMAIL);
+
+        verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void loginRejectsUnknownEmail() {
+        LoginRequest request = new LoginRequest("unknown@email.com", "password123!");
+        when(userRepository.findByEmail("unknown@email.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+    }
+
+    @Test
+    void loginRejectsWrongPasswordWithSameAuthenticationError() {
+        LoginRequest request = new LoginRequest("jiwoo.mom@email.com", "wrong-password");
+        User user = mock(User.class);
+        when(userRepository.findByEmail("jiwoo.mom@email.com")).thenReturn(Optional.of(user));
+        when(user.getPassword()).thenReturn("encoded-password");
+        when(passwordEncoder.matches("wrong-password", "encoded-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+
+        verify(jwtTokenProvider, never()).issueTokens(any());
     }
 
     private SignupRequest validRequest() {

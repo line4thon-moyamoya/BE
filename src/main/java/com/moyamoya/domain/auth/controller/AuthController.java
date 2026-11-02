@@ -1,6 +1,8 @@
 package com.moyamoya.domain.auth.controller;
 
+import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.service.AuthService;
 import com.moyamoya.global.common.BaseResponse;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private static final String SIGNUP_SUCCESS_MESSAGE = "회원가입이 완료되었습니다.";
+    private static final String LOGIN_SUCCESS_MESSAGE = "로그인에 성공했습니다.";
     private static final String SIGNUP_REQUEST_EXAMPLE = """
             {
               "email": "jiwoo.mom@email.com",
@@ -131,6 +134,41 @@ public class AuthController {
               "data": null
             }
             """;
+    private static final String LOGIN_REQUEST_EXAMPLE = """
+            {
+              "email": "jiwoo.mom@email.com",
+              "password": "password123!"
+            }
+            """;
+    private static final String LOGIN_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "로그인에 성공했습니다.",
+              "data": {
+                "userId": 1,
+                "selectedChildId": 1,
+                "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+              }
+            }
+            """;
+    private static final String MISSING_LOGIN_CREDENTIALS_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH400",
+              "message": "이메일과 비밀번호를 모두 입력해 주세요.",
+              "data": null
+            }
+            """;
+    private static final String INVALID_CREDENTIALS_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401",
+              "message": "이메일 또는 비밀번호가 올바르지 않습니다.",
+              "data": null
+            }
+            """;
 
     private final AuthService authService;
 
@@ -202,5 +240,66 @@ public class AuthController {
     ) {
         SignupResponse response = authService.signup(request);
         return ResponseEntity.ok(BaseResponse.success(SIGNUP_SUCCESS_MESSAGE, response));
+    }
+
+    @Operation(summary = "보호자 로그인")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "로그인 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = LOGIN_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "이메일 또는 비밀번호 누락 및 이메일 형식 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "이메일 또는 비밀번호 누락",
+                                            value = MISSING_LOGIN_CREDENTIALS_EXAMPLE
+                                    ),
+                                    @ExampleObject(name = "잘못된 이메일", value = INVALID_EMAIL_EXAMPLE)
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "이메일 또는 비밀번호 불일치",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INVALID_CREDENTIALS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)
+                    )
+            )
+    })
+    @PostMapping("/login")
+    public ResponseEntity<BaseResponse<LoginResponse>> login(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = LoginRequest.class),
+                            examples = @ExampleObject(value = LOGIN_REQUEST_EXAMPLE)
+                    )
+            )
+            @RequestBody LoginRequest request
+    ) {
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(BaseResponse.success(LOGIN_SUCCESS_MESSAGE, response));
     }
 }

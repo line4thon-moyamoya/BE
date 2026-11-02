@@ -1,7 +1,9 @@
 package com.moyamoya.domain.auth.service;
 
 import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
+import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.child.entity.AgeGroup;
@@ -71,6 +73,7 @@ public class AuthService {
         Child child = childRepository.save(
                 Child.create(user, request.child().nickname().trim(), ageGroup)
         );
+        user.updateLastSelectedChildId(child.getId());
 
         List<ConsentRecord> consentRecords = consents.stream()
                 .map(consent -> ConsentRecord.create(
@@ -90,6 +93,43 @@ public class AuthService {
                 tokens.accessToken(),
                 tokens.refreshToken()
         );
+    }
+
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
+        validateLoginRequest(request);
+
+        String email = request.email().trim().toLowerCase(Locale.ROOT);
+        validateEmail(email);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.INVALID_CREDENTIALS));
+
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+            throw new CustomException(AuthErrorCode.INVALID_CREDENTIALS);
+        }
+
+        IssuedTokens tokens = jwtTokenProvider.issueTokens(user.getId());
+        user.updateRefreshToken(tokenHasher.hash(tokens.refreshToken()));
+        Long selectedChildId = resolveSelectedChildId(user);
+
+        return new LoginResponse(
+                user.getId(),
+                selectedChildId,
+                tokens.accessToken(),
+                tokens.refreshToken()
+        );
+    }
+
+    private Long resolveSelectedChildId(User user) {
+        if (user.getLastSelectedChildId() != null) {
+            return user.getLastSelectedChildId();
+        }
+
+        Child firstChild = childRepository.findFirstByUserOrderByIdAsc(user)
+                .orElseThrow(() -> new IllegalStateException("로그인 사용자의 아이 프로필이 없습니다."));
+        user.updateLastSelectedChildId(firstChild.getId());
+        return firstChild.getId();
     }
 
     private User saveUser(String email, String password, String parentPin) {
@@ -116,6 +156,12 @@ public class AuthService {
                 || request.consents() == null
                 || request.consents().isEmpty()) {
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+        }
+    }
+
+    private void validateLoginRequest(LoginRequest request) {
+        if (request == null || isBlank(request.email()) || isBlank(request.password())) {
+            throw new CustomException(AuthErrorCode.MISSING_LOGIN_CREDENTIALS);
         }
     }
 

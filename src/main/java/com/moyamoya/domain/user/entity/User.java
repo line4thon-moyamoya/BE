@@ -38,6 +38,9 @@ public class User extends BaseTimeEntity {
     @Column(name = "refresh_token", length = 255)
     private String refreshToken;
 
+    @Column(name = "last_selected_child_id")
+    private Long lastSelectedChildId;
+
     @Column(name = "weekly_report_enabled")
     private Boolean weeklyReportEnabled;
 
@@ -54,5 +57,9 @@ public class User extends BaseTimeEntity {
 
     public void updateRefreshToken(String refreshTokenHash) {
         this.refreshToken = refreshTokenHash;
+    }
+
+    public void updateLastSelectedChildId(Long childId) {
+        this.lastSelectedChildId = childId;
     }
 }
