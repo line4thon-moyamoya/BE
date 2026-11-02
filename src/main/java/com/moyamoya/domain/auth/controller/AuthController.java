@@ -5,6 +5,7 @@ import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.LogoutResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
@@ -270,6 +271,22 @@ public class AuthController {
               "data": null
             }
             """;
+    private static final String LOGOUT_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "로그아웃되었습니다.",
+              "data": {}
+            }
+            """;
+    private static final String INVALID_ACCESS_TOKEN_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401",
+              "message": "유효하지 않은 Access Token입니다.",
+              "data": null
+            }
+            """;
 
     private final AuthService authService;
 
@@ -480,6 +497,47 @@ public class AuthController {
     ) {
         TokenRefreshResponse response = authService.refresh(request);
         return ResponseEntity.ok(BaseResponse.success("Access Token이 재발급되었습니다.", response));
+    }
+
+    @Operation(
+            summary = "로그아웃",
+            description = "Access Token으로 로그인 사용자를 확인한 뒤 서버에 저장된 Refresh Token을 제거합니다. "
+                    + "성공 후 클라이언트도 보관 중인 Access Token과 Refresh Token을 삭제해야 합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "로그아웃 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = LOGOUT_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Access Token 누락 또는 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INVALID_ACCESS_TOKEN_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)
+                    )
+            )
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<BaseResponse<LogoutResponse>> logout(Principal principal) {
+        LogoutResponse response = authService.logout(Long.valueOf(principal.getName()));
+        return ResponseEntity.ok(BaseResponse.success("로그아웃되었습니다.", response));
     }
 
     @Operation(

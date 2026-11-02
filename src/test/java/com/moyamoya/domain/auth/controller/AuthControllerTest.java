@@ -14,6 +14,7 @@ import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.LogoutResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
@@ -213,6 +214,20 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("AUTH400"))
                 .andExpect(jsonPath("$.message").value("Refresh Token을 입력해 주세요."));
+    }
+
+    @Test
+    void logoutReturnsExpectedResponse() throws Exception {
+        when(authService.logout(1L)).thenReturn(new LogoutResponse());
+
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .principal(() -> "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("로그아웃되었습니다."))
+                .andExpect(jsonPath("$.data").isMap())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test

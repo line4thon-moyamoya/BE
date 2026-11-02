@@ -6,6 +6,7 @@ import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.LogoutResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
@@ -148,6 +149,14 @@ public class AuthService {
         user.updateRefreshToken(tokenHasher.hash(tokens.refreshToken()));
 
         return new TokenRefreshResponse(tokens.accessToken(), tokens.refreshToken());
+    }
+
+    @Transactional
+    public LogoutResponse logout(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(SecurityErrorCode.INVALID_ACCESS_TOKEN));
+        user.clearRefreshToken();
+        return new LogoutResponse();
     }
 
     @Transactional(readOnly = true)

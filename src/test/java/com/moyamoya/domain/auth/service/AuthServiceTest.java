@@ -18,6 +18,7 @@ import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
 import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
+import com.moyamoya.domain.auth.dto.response.LogoutResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
 import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
@@ -37,6 +38,7 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.security.IssuedTokens;
 import com.moyamoya.security.JwtTokenProvider;
 import com.moyamoya.security.TokenHasher;
+import com.moyamoya.security.exception.SecurityErrorCode;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import java.util.ArrayList;
@@ -393,6 +395,27 @@ class AuthServiceTest {
                 .isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN);
 
         verify(jwtTokenProvider, never()).issueTokens(any());
+    }
+
+    @Test
+    void logoutClearsStoredRefreshToken() {
+        User user = mock(User.class);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        LogoutResponse response = authService.logout(1L);
+
+        assertThat(response).isNotNull();
+        verify(user).clearRefreshToken();
+    }
+
+    @Test
+    void logoutRejectsTokenForUnknownUser() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.logout(1L))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(SecurityErrorCode.INVALID_ACCESS_TOKEN);
     }
 
     @Test

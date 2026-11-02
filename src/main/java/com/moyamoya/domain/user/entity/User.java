@@ -59,6 +59,10 @@ public class User extends BaseTimeEntity {
         this.refreshToken = refreshTokenHash;
     }
 
+    public void clearRefreshToken() {
+        this.refreshToken = null;
+    }
+
     public void updateLastSelectedChildId(Long childId) {
         this.lastSelectedChildId = childId;
     }
