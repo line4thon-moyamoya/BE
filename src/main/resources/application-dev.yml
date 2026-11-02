@@ -15,3 +15,7 @@ logging:
   level:
     com.moyamoya: debug
 
+jwt:
+  access-token-expiration-ms: ${ACCESS_TOKEN_TTL:86400000}
+  refresh-token-expiration-ms: ${REFRESH_TOKEN_TTL:7776000000}
+

@@ -23,3 +23,7 @@ logging:
     root: info
     com.moyamoya: info
 
+jwt:
+  access-token-expiration-ms: ${ACCESS_TOKEN_TTL}
+  refresh-token-expiration-ms: ${REFRESH_TOKEN_TTL}
+
