@@ -51,13 +51,11 @@ public class JwtTokenProvider {
     }
 
     public Long getUserIdFromAccessToken(String token) {
-        Claims claims = parseClaims(token);
-        String tokenType = claims.get(TOKEN_TYPE_CLAIM, String.class);
-        if (!ACCESS_TOKEN_TYPE.equals(tokenType)) {
-            throw new JwtException("Access Token이 아닙니다.");
-        }
+        return getUserIdFromToken(token, ACCESS_TOKEN_TYPE);
+    }
 
-        return Long.valueOf(claims.getSubject());
+    public Long getUserIdFromRefreshToken(String token) {
+        return getUserIdFromToken(token, REFRESH_TOKEN_TYPE);
     }
 
     private String createToken(Long userId, String tokenType, long expirationMs) {
@@ -79,5 +77,15 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    private Long getUserIdFromToken(String token, String expectedTokenType) {
+        Claims claims = parseClaims(token);
+        String tokenType = claims.get(TOKEN_TYPE_CLAIM, String.class);
+        if (!expectedTokenType.equals(tokenType)) {
+            throw new JwtException("올바른 토큰 타입이 아닙니다.");
+        }
+
+        return Long.valueOf(claims.getSubject());
     }
 }

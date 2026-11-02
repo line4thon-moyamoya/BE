@@ -19,6 +19,11 @@ public enum AuthErrorCode implements BaseErrorCode {
             "이메일과 비밀번호를 모두 입력해 주세요.",
             HttpStatus.BAD_REQUEST
     ),
+    MISSING_REFRESH_TOKEN(
+            "AUTH400",
+            "Refresh Token을 입력해 주세요.",
+            HttpStatus.BAD_REQUEST
+    ),
     INVALID_EMAIL(
             "AUTH400_INVALID_EMAIL",
             "올바른 이메일 형식으로 입력해 주세요.",
@@ -32,6 +37,16 @@ public enum AuthErrorCode implements BaseErrorCode {
     INVALID_CREDENTIALS(
             "AUTH401",
             "이메일 또는 비밀번호가 올바르지 않습니다.",
+            HttpStatus.UNAUTHORIZED
+    ),
+    INVALID_REFRESH_TOKEN(
+            "AUTH401_INVALID_REFRESH_TOKEN",
+            "유효하지 않은 Refresh Token입니다.",
+            HttpStatus.UNAUTHORIZED
+    ),
+    EXPIRED_REFRESH_TOKEN(
+            "AUTH401_EXPIRED_REFRESH_TOKEN",
+            "Refresh Token이 만료되었습니다. 다시 로그인해 주세요.",
             HttpStatus.UNAUTHORIZED
     ),
     DUPLICATE_EMAIL(

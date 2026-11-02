@@ -12,9 +12,11 @@ import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
+import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.auth.exception.AuthExceptionHandler;
 import com.moyamoya.domain.auth.exception.ParentPinErrorCode;
@@ -159,6 +161,58 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("AUTH400"))
                 .andExpect(jsonPath("$.message").value("이메일과 비밀번호를 모두 입력해 주세요."));
+    }
+
+    @Test
+    void refreshReturnsExpectedResponse() throws Exception {
+        TokenRefreshResponse response = new TokenRefreshResponse(
+                "new-access-token",
+                "new-refresh-token"
+        );
+        when(authService.refresh(any(TokenRefreshRequest.class))).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "old-refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("Access Token이 재발급되었습니다."))
+                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("new-refresh-token"));
+    }
+
+    @Test
+    void refreshReturnsInvalidRefreshTokenError() throws Exception {
+        when(authService.refresh(any(TokenRefreshRequest.class)))
+                .thenThrow(new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "invalid-refresh-token"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("AUTH401_INVALID_REFRESH_TOKEN"))
+                .andExpect(jsonPath("$.message").value("유효하지 않은 Refresh Token입니다."));
+    }
+
+    @Test
+    void refreshReturnsSpecificErrorForMalformedJson() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("AUTH400"))
+                .andExpect(jsonPath("$.message").value("Refresh Token을 입력해 주세요."));
     }
 
     @Test

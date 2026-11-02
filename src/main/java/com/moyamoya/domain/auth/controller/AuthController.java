@@ -3,9 +3,11 @@ package com.moyamoya.domain.auth.controller;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
+import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
 import com.moyamoya.domain.auth.service.AuthService;
 import com.moyamoya.global.common.BaseResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -228,6 +230,46 @@ public class AuthController {
               "data": null
             }
             """;
+    private static final String TOKEN_REFRESH_REQUEST_EXAMPLE = """
+            {
+              "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+            }
+            """;
+    private static final String TOKEN_REFRESH_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "Access Token이 재발급되었습니다.",
+              "data": {
+                "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+                "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+              }
+            }
+            """;
+    private static final String MISSING_REFRESH_TOKEN_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH400",
+              "message": "Refresh Token을 입력해 주세요.",
+              "data": null
+            }
+            """;
+    private static final String INVALID_REFRESH_TOKEN_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401_INVALID_REFRESH_TOKEN",
+              "message": "유효하지 않은 Refresh Token입니다.",
+              "data": null
+            }
+            """;
+    private static final String EXPIRED_REFRESH_TOKEN_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401_EXPIRED_REFRESH_TOKEN",
+              "message": "Refresh Token이 만료되었습니다. 다시 로그인해 주세요.",
+              "data": null
+            }
+            """;
 
     private final AuthService authService;
 
@@ -370,6 +412,74 @@ public class AuthController {
     ) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(BaseResponse.success(LOGIN_SUCCESS_MESSAGE, response));
+    }
+
+    @Operation(
+            summary = "Access Token 재발급",
+            description = "Refresh Token의 서명·만료 여부와 서버에 저장된 해시를 검증합니다. "
+                    + "성공 시 Access Token과 Refresh Token을 모두 새로 발급하며 기존 Refresh Token은 무효화됩니다."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "토큰 재발급 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = TOKEN_REFRESH_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Refresh Token 누락",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = MISSING_REFRESH_TOKEN_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "유효하지 않거나 만료된 Refresh Token",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "유효하지 않은 Refresh Token",
+                                            value = INVALID_REFRESH_TOKEN_EXAMPLE
+                                    ),
+                                    @ExampleObject(
+                                            name = "만료된 Refresh Token",
+                                            value = EXPIRED_REFRESH_TOKEN_EXAMPLE
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)
+                    )
+            )
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<BaseResponse<TokenRefreshResponse>> refresh(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = TokenRefreshRequest.class),
+                            examples = @ExampleObject(value = TOKEN_REFRESH_REQUEST_EXAMPLE)
+                    )
+            )
+            @RequestBody TokenRefreshRequest request
+    ) {
+        TokenRefreshResponse response = authService.refresh(request);
+        return ResponseEntity.ok(BaseResponse.success("Access Token이 재발급되었습니다.", response));
     }
 
     @Operation(

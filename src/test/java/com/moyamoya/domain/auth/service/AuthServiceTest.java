@@ -16,9 +16,11 @@ import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
+import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.auth.exception.ParentPinErrorCode;
 import com.moyamoya.domain.child.entity.Child;
@@ -35,6 +37,8 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.security.IssuedTokens;
 import com.moyamoya.security.JwtTokenProvider;
 import com.moyamoya.security.TokenHasher;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -283,6 +287,76 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(AuthErrorCode.INVALID_CREDENTIALS);
+
+        verify(jwtTokenProvider, never()).issueTokens(any());
+    }
+
+    @Test
+    void refreshRotatesAccessAndRefreshTokens() {
+        TokenRefreshRequest request = new TokenRefreshRequest("old-refresh-token");
+        User user = mock(User.class);
+        when(jwtTokenProvider.getUserIdFromRefreshToken("old-refresh-token")).thenReturn(1L);
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+        when(user.getRefreshToken()).thenReturn("old-refresh-token-hash");
+        when(tokenHasher.matches("old-refresh-token", "old-refresh-token-hash")).thenReturn(true);
+        when(jwtTokenProvider.issueTokens(1L))
+                .thenReturn(new IssuedTokens("new-access-token", "new-refresh-token"));
+        when(tokenHasher.hash("new-refresh-token")).thenReturn("new-refresh-token-hash");
+
+        TokenRefreshResponse response = authService.refresh(request);
+
+        assertThat(response.accessToken()).isEqualTo("new-access-token");
+        assertThat(response.refreshToken()).isEqualTo("new-refresh-token");
+        verify(user).updateRefreshToken("new-refresh-token-hash");
+    }
+
+    @Test
+    void refreshRejectsMissingToken() {
+        TokenRefreshRequest request = new TokenRefreshRequest("");
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.MISSING_REFRESH_TOKEN);
+    }
+
+    @Test
+    void refreshRejectsInvalidToken() {
+        TokenRefreshRequest request = new TokenRefreshRequest("invalid-refresh-token");
+        when(jwtTokenProvider.getUserIdFromRefreshToken("invalid-refresh-token"))
+                .thenThrow(new JwtException("invalid"));
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN);
+    }
+
+    @Test
+    void refreshRejectsExpiredToken() {
+        TokenRefreshRequest request = new TokenRefreshRequest("expired-refresh-token");
+        when(jwtTokenProvider.getUserIdFromRefreshToken("expired-refresh-token"))
+                .thenThrow(new ExpiredJwtException(null, null, "expired"));
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.EXPIRED_REFRESH_TOKEN);
+    }
+
+    @Test
+    void refreshRejectsTokenThatDoesNotMatchStoredHash() {
+        TokenRefreshRequest request = new TokenRefreshRequest("old-refresh-token");
+        User user = mock(User.class);
+        when(jwtTokenProvider.getUserIdFromRefreshToken("old-refresh-token")).thenReturn(1L);
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
+        when(user.getRefreshToken()).thenReturn("different-token-hash");
+        when(tokenHasher.matches("old-refresh-token", "different-token-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.refresh(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN);
 
         verify(jwtTokenProvider, never()).issueTokens(any());
     }

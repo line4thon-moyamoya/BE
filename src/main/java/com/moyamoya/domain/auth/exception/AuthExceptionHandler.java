@@ -22,6 +22,8 @@ public class AuthExceptionHandler {
         BaseErrorCode errorCode;
         if (request.getRequestURI().endsWith("/login")) {
             errorCode = AuthErrorCode.MISSING_LOGIN_CREDENTIALS;
+        } else if (request.getRequestURI().endsWith("/refresh")) {
+            errorCode = AuthErrorCode.MISSING_REFRESH_TOKEN;
         } else if (request.getRequestURI().endsWith("/parent-pin/verify")) {
             errorCode = ParentPinErrorCode.PARENT_PIN_REQUIRED;
         } else {

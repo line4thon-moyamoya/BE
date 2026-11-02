@@ -38,6 +38,7 @@ class JwtTokenProviderTest {
         assertThat(refreshClaims.get("tokenType")).isEqualTo("REFRESH");
         assertThat(refreshClaims.getExpiration()).isEqualTo(java.util.Date.from(now.plusSeconds(120)));
         assertThat(provider.getUserIdFromAccessToken(tokens.accessToken())).isEqualTo(1L);
+        assertThat(provider.getUserIdFromRefreshToken(tokens.refreshToken())).isEqualTo(1L);
         assertThatThrownBy(() -> provider.getUserIdFromAccessToken(tokens.refreshToken()))
                 .isInstanceOf(io.jsonwebtoken.JwtException.class);
 

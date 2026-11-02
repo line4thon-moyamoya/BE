@@ -18,4 +18,14 @@ public class TokenHasher {
             throw new IllegalStateException("SHA-256 알고리즘을 사용할 수 없습니다.", exception);
         }
     }
+
+    public boolean matches(String token, String storedHash) {
+        if (token == null || storedHash == null) {
+            return false;
+        }
+
+        byte[] actual = hash(token).getBytes(StandardCharsets.US_ASCII);
+        byte[] expected = storedHash.getBytes(StandardCharsets.US_ASCII);
+        return MessageDigest.isEqual(actual, expected);
+    }
 }

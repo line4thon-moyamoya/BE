@@ -4,9 +4,11 @@ import com.moyamoya.domain.auth.dto.request.ConsentAgreementRequest;
 import com.moyamoya.domain.auth.dto.request.LoginRequest;
 import com.moyamoya.domain.auth.dto.request.ParentPinVerifyRequest;
 import com.moyamoya.domain.auth.dto.request.SignupRequest;
+import com.moyamoya.domain.auth.dto.request.TokenRefreshRequest;
 import com.moyamoya.domain.auth.dto.response.LoginResponse;
 import com.moyamoya.domain.auth.dto.response.ParentPinVerifyResponse;
 import com.moyamoya.domain.auth.dto.response.SignupResponse;
+import com.moyamoya.domain.auth.dto.response.TokenRefreshResponse;
 import com.moyamoya.domain.auth.exception.AuthErrorCode;
 import com.moyamoya.domain.auth.exception.ParentPinErrorCode;
 import com.moyamoya.domain.child.entity.AgeGroup;
@@ -26,6 +28,8 @@ import com.moyamoya.security.IssuedTokens;
 import com.moyamoya.security.JwtTokenProvider;
 import com.moyamoya.security.TokenHasher;
 import com.moyamoya.security.exception.SecurityErrorCode;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -126,6 +130,26 @@ public class AuthService {
         );
     }
 
+    @Transactional
+    public TokenRefreshResponse refresh(TokenRefreshRequest request) {
+        if (request == null || isBlank(request.refreshToken())) {
+            throw new CustomException(AuthErrorCode.MISSING_REFRESH_TOKEN);
+        }
+
+        Long userId = parseRefreshTokenUserId(request.refreshToken());
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        if (!tokenHasher.matches(request.refreshToken(), user.getRefreshToken())) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        IssuedTokens tokens = jwtTokenProvider.issueTokens(userId);
+        user.updateRefreshToken(tokenHasher.hash(tokens.refreshToken()));
+
+        return new TokenRefreshResponse(tokens.accessToken(), tokens.refreshToken());
+    }
+
     @Transactional(readOnly = true)
     public ParentPinVerifyResponse verifyParentPin(
             Long userId,
@@ -160,6 +184,16 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException("로그인 사용자의 아이 프로필이 없습니다."));
         user.updateLastSelectedChildId(firstChild.getId());
         return firstChild.getId();
+    }
+
+    private Long parseRefreshTokenUserId(String refreshToken) {
+        try {
+            return jwtTokenProvider.getUserIdFromRefreshToken(refreshToken);
+        } catch (ExpiredJwtException exception) {
+            throw new CustomException(AuthErrorCode.EXPIRED_REFRESH_TOKEN);
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
     }
 
     private User saveUser(String email, String password, String parentPin) {
