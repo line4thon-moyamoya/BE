@@ -31,6 +31,7 @@ import com.moyamoya.security.TokenHasher;
 import com.moyamoya.security.exception.SecurityErrorCode;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,9 @@ public class AuthService {
             "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
     );
     private static final Pattern PARENT_PIN_PATTERN = Pattern.compile("^\\d{4}$");
+    private static final int MAX_EMAIL_LENGTH = 255;
+    private static final int MAX_CHILD_NICKNAME_LENGTH = 50;
+    private static final int MAX_BCRYPT_PASSWORD_BYTES = 72;
 
     private final UserRepository userRepository;
     private final ChildRepository childRepository;
@@ -166,15 +170,17 @@ public class AuthService {
     ) {
         validateParentPinRequest(request);
 
-        if (parentPinAttemptLimiter.isBlocked(userId)) {
-            throw new CustomException(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
-        }
-
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(SecurityErrorCode.AUTHENTICATION_REQUIRED));
 
+        ParentPinAttemptLimiter.AttemptReservation reservation =
+                parentPinAttemptLimiter.reserveAttempt(userId);
+        if (reservation == ParentPinAttemptLimiter.AttemptReservation.BLOCKED) {
+            throw new CustomException(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
+        }
+
         if (!passwordEncoder.matches(request.parentPin(), user.getParentPin())) {
-            if (parentPinAttemptLimiter.recordFailure(userId)) {
+            if (reservation == ParentPinAttemptLimiter.AttemptReservation.FINAL_ALLOWED_ATTEMPT) {
                 throw new CustomException(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
             }
             throw new CustomException(ParentPinErrorCode.PARENT_PIN_MISMATCH);
@@ -227,6 +233,15 @@ public class AuthService {
                 || request.child() == null
                 || isBlank(request.child().nickname())
                 || request.consents() == null) {
+            throw new CustomException(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+        }
+
+        String email = request.email().trim();
+        String nickname = request.child().nickname().trim();
+        if (email.codePointCount(0, email.length()) > MAX_EMAIL_LENGTH
+                || nickname.codePointCount(0, nickname.length()) > MAX_CHILD_NICKNAME_LENGTH
+                || request.password().getBytes(StandardCharsets.UTF_8).length
+                > MAX_BCRYPT_PASSWORD_BYTES) {
             throw new CustomException(AuthErrorCode.INVALID_SIGNUP_REQUEST);
         }
 

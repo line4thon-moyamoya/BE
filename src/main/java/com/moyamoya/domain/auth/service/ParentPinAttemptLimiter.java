@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -25,38 +26,33 @@ public class ParentPinAttemptLimiter {
         this.clock = clock;
     }
 
-    public boolean isBlocked(Long userId) {
-        AttemptState state = attempts.get(userId);
-        if (state == null) {
-            return false;
-        }
-
+    public AttemptReservation reserveAttempt(Long userId) {
         Instant now = clock.instant();
-        if (state.blockedUntil() != null && now.isBefore(state.blockedUntil())) {
-            return true;
-        }
+        AtomicReference<AttemptReservation> reservation = new AtomicReference<>();
 
-        if (state.blockedUntil() != null || isWindowExpired(state, now)) {
-            attempts.remove(userId, state);
-        }
-        return false;
-    }
+        attempts.compute(userId, (key, current) -> {
+            if (current != null
+                    && current.blockedUntil() != null
+                    && now.isBefore(current.blockedUntil())) {
+                reservation.set(AttemptReservation.BLOCKED);
+                return current;
+            }
 
-    public boolean recordFailure(Long userId) {
-        Instant now = clock.instant();
-        AttemptState state = attempts.compute(userId, (key, current) -> {
             if (current == null || current.blockedUntil() != null || isWindowExpired(current, now)) {
-                return new AttemptState(1, now, null);
+                return reserveFirstAttempt(now, reservation);
             }
 
             int failedAttempts = current.failedAttempts() + 1;
             Instant blockedUntil = failedAttempts >= properties.maxFailedAttempts()
                     ? now.plusMillis(properties.blockDurationMs())
                     : null;
+            reservation.set(blockedUntil == null
+                    ? AttemptReservation.ALLOWED
+                    : AttemptReservation.FINAL_ALLOWED_ATTEMPT);
             return new AttemptState(failedAttempts, current.windowStartedAt(), blockedUntil);
         });
 
-        return state.blockedUntil() != null && now.isBefore(state.blockedUntil());
+        return reservation.get();
     }
 
     public void reset(Long userId) {
@@ -65,6 +61,25 @@ public class ParentPinAttemptLimiter {
 
     private boolean isWindowExpired(AttemptState state, Instant now) {
         return !now.isBefore(state.windowStartedAt().plusMillis(properties.failureWindowMs()));
+    }
+
+    private AttemptState reserveFirstAttempt(
+            Instant now,
+            AtomicReference<AttemptReservation> reservation
+    ) {
+        Instant blockedUntil = properties.maxFailedAttempts() == 1
+                ? now.plusMillis(properties.blockDurationMs())
+                : null;
+        reservation.set(blockedUntil == null
+                ? AttemptReservation.ALLOWED
+                : AttemptReservation.FINAL_ALLOWED_ATTEMPT);
+        return new AttemptState(1, now, blockedUntil);
+    }
+
+    public enum AttemptReservation {
+        ALLOWED,
+        FINAL_ALLOWED_ATTEMPT,
+        BLOCKED
     }
 
     private record AttemptState(

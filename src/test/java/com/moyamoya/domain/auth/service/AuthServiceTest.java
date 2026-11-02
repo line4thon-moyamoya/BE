@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,6 +48,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -208,6 +210,54 @@ class AuthServiceTest {
                 "1234",
                 new ChildSignupRequest("지우", "AGE_3_4"),
                 null
+        );
+
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+    }
+
+    @Test
+    void signupRejectsEmailLongerThanDatabaseColumn() {
+        SignupRequest request = new SignupRequest(
+                "a".repeat(244) + "@example.com",
+                "password123!",
+                "1234",
+                new ChildSignupRequest("지우", "AGE_3_4"),
+                validAgreements(true)
+        );
+
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+    }
+
+    @Test
+    void signupRejectsNicknameLongerThanDatabaseColumn() {
+        SignupRequest request = new SignupRequest(
+                "jiwoo.mom@email.com",
+                "password123!",
+                "1234",
+                new ChildSignupRequest("가".repeat(51), "AGE_3_4"),
+                validAgreements(true)
+        );
+
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_SIGNUP_REQUEST);
+    }
+
+    @Test
+    void signupRejectsPasswordLongerThanBcryptByteLimit() {
+        SignupRequest request = new SignupRequest(
+                "jiwoo.mom@email.com",
+                "가".repeat(25),
+                "1234",
+                new ChildSignupRequest("지우", "AGE_3_4"),
+                validAgreements(true)
         );
 
         assertThatThrownBy(() -> authService.signup(request))
@@ -422,9 +472,10 @@ class AuthServiceTest {
     void verifyParentPinReturnsParentModeToken() {
         ParentPinVerifyRequest request = new ParentPinVerifyRequest("1234");
         User user = mock(User.class);
-        when(parentPinAttemptLimiter.isBlocked(1L)).thenReturn(false);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(user.getParentPin()).thenReturn("encoded-parent-pin");
+        when(parentPinAttemptLimiter.reserveAttempt(1L))
+                .thenReturn(ParentPinAttemptLimiter.AttemptReservation.ALLOWED);
         when(passwordEncoder.matches("1234", "encoded-parent-pin")).thenReturn(true);
         when(jwtTokenProvider.issueParentModeToken(1L)).thenReturn("parent-mode-token");
 
@@ -432,6 +483,9 @@ class AuthServiceTest {
 
         assertThat(response.parentModeToken()).isEqualTo("parent-mode-token");
         verify(parentPinAttemptLimiter).reset(1L);
+        InOrder inOrder = inOrder(parentPinAttemptLimiter, passwordEncoder);
+        inOrder.verify(parentPinAttemptLimiter).reserveAttempt(1L);
+        inOrder.verify(passwordEncoder).matches("1234", "encoded-parent-pin");
     }
 
     @Test
@@ -458,11 +512,11 @@ class AuthServiceTest {
     void verifyParentPinRejectsMismatchedPin() {
         ParentPinVerifyRequest request = new ParentPinVerifyRequest("9999");
         User user = mock(User.class);
-        when(parentPinAttemptLimiter.isBlocked(1L)).thenReturn(false);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(user.getParentPin()).thenReturn("encoded-parent-pin");
+        when(parentPinAttemptLimiter.reserveAttempt(1L))
+                .thenReturn(ParentPinAttemptLimiter.AttemptReservation.ALLOWED);
         when(passwordEncoder.matches("9999", "encoded-parent-pin")).thenReturn(false);
-        when(parentPinAttemptLimiter.recordFailure(1L)).thenReturn(false);
 
         assertThatThrownBy(() -> authService.verifyParentPin(1L, request))
                 .isInstanceOf(CustomException.class)
@@ -473,25 +527,28 @@ class AuthServiceTest {
     @Test
     void verifyParentPinRejectsBlockedUser() {
         ParentPinVerifyRequest request = new ParentPinVerifyRequest("1234");
-        when(parentPinAttemptLimiter.isBlocked(1L)).thenReturn(true);
+        User user = mock(User.class);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(parentPinAttemptLimiter.reserveAttempt(1L))
+                .thenReturn(ParentPinAttemptLimiter.AttemptReservation.BLOCKED);
 
         assertThatThrownBy(() -> authService.verifyParentPin(1L, request))
                 .isInstanceOf(CustomException.class)
                 .extracting(exception -> ((CustomException) exception).getErrorCode())
                 .isEqualTo(ParentPinErrorCode.TOO_MANY_ATTEMPTS);
 
-        verify(userRepository, never()).findById(any());
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
     }
 
     @Test
     void verifyParentPinBlocksOnThresholdFailure() {
         ParentPinVerifyRequest request = new ParentPinVerifyRequest("9999");
         User user = mock(User.class);
-        when(parentPinAttemptLimiter.isBlocked(1L)).thenReturn(false);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(user.getParentPin()).thenReturn("encoded-parent-pin");
+        when(parentPinAttemptLimiter.reserveAttempt(1L))
+                .thenReturn(ParentPinAttemptLimiter.AttemptReservation.FINAL_ALLOWED_ATTEMPT);
         when(passwordEncoder.matches("9999", "encoded-parent-pin")).thenReturn(false);
-        when(parentPinAttemptLimiter.recordFailure(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> authService.verifyParentPin(1L, request))
                 .isInstanceOf(CustomException.class)
