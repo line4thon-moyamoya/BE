@@ -1,6 +1,8 @@
 package com.moyamoya.domain.report.entity;
 
 import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.report.exception.WeeklyReportErrorCode;
+import com.moyamoya.global.exception.CustomException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -9,8 +11,10 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 
 @Entity
 @Table(
@@ -53,8 +57,15 @@ public class WeeklyReport {
     ) {
         WeeklyReport report = new WeeklyReport();
         report.child = child;
-        report.weekStartDate = weekStartDate;
+        report.weekStartDate = normalizeWeekStartDate(weekStartDate);
         report.reportData = reportData;
         return report;
+    }
+
+    private static LocalDate normalizeWeekStartDate(LocalDate date) {
+        if (date == null) {
+            throw new CustomException(WeeklyReportErrorCode.REPORT_INVALID_WEEK);
+        }
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 }

@@ -1,4 +1,7 @@
 package com.moyamoya.domain.word.repository;
 
-public class LearnedWordRepository {
+import com.moyamoya.domain.word.entity.LearnedWord;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface LearnedWordRepository extends JpaRepository<LearnedWord, Long> {
 }
