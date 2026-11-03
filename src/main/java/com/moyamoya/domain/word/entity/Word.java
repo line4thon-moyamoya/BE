@@ -7,7 +7,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "words")
+@Table(
+        name = "words",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_words_word",
+                columnNames = "word"
+        )
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Word extends BaseTimeEntity {
@@ -100,4 +106,3 @@ public class Word extends BaseTimeEntity {
         return newWord;
     }
 }
-
