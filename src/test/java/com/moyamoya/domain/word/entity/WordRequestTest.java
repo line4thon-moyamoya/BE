@@ -33,6 +33,19 @@ class WordRequestTest {
     }
 
     @Test
+    void resolveRejectsCorrectedWordLongerThanColumnLimit() {
+        WordRequest request = WordRequest.create(null, "사과", null);
+        String tooLongWord = "a".repeat(101);
+
+        assertThatThrownBy(() -> request.resolve(tooLongWord))
+                .isInstanceOf(CustomException.class)
+                .extracting(exception -> ((CustomException) exception).getErrorCode())
+                .isEqualTo(WordErrorCode.WORD_REQUEST400);
+        assertThat(request.getStatus()).isEqualTo(WordRequestStatus.PENDING);
+        assertThat(request.getResolvedAt()).isNull();
+    }
+
+    @Test
     void resolveTrimsCorrectedWordBeforeResolving() {
         WordRequest request = WordRequest.create(null, "사과", null);
 

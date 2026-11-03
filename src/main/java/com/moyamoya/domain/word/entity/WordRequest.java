@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WordRequest {
 
+    private static final int CORRECTED_WORD_MAX_LENGTH = 100;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "word_request_id")
@@ -66,6 +68,9 @@ public class WordRequest {
 
         String normalizedCorrectedWord = correctedWord == null ? null : correctedWord.trim();
         if (normalizedCorrectedWord == null || normalizedCorrectedWord.isBlank()) {
+            throw new CustomException(WordErrorCode.WORD_REQUEST400);
+        }
+        if (normalizedCorrectedWord.length() > CORRECTED_WORD_MAX_LENGTH) {
             throw new CustomException(WordErrorCode.WORD_REQUEST400);
         }
 
