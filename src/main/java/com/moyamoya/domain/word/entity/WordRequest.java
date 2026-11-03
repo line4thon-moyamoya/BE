@@ -1,6 +1,8 @@
 package com.moyamoya.domain.word.entity;
 
 import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.word.exception.WordErrorCode;
+import com.moyamoya.global.exception.CustomException;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -58,7 +60,16 @@ public class WordRequest {
     }
 
     public void resolve(String correctedWord) {
-        this.correctedWord = correctedWord;
+        if (this.status != WordRequestStatus.PENDING) {
+            throw new CustomException(WordErrorCode.WORD_REQUEST409);
+        }
+
+        String normalizedCorrectedWord = correctedWord == null ? null : correctedWord.trim();
+        if (normalizedCorrectedWord == null || normalizedCorrectedWord.isBlank()) {
+            throw new CustomException(WordErrorCode.WORD_REQUEST400);
+        }
+
+        this.correctedWord = normalizedCorrectedWord;
         this.status = WordRequestStatus.RESOLVED;
         this.resolvedAt = LocalDateTime.now();
     }
