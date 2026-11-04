@@ -26,5 +26,9 @@ public class BaseResponse<T> {
     public static BaseResponse<Void> error(String code, String message) {
         return new BaseResponse<>(false, code, message, null);
     }
+
+    public static <T> BaseResponse<T> created(String message, T data) {
+        return new BaseResponse<>(true, 201, message, data);
+    }
 }
 

@@ -53,4 +53,10 @@ public class Child extends BaseTimeEntity {
     public static Child create(User user, String nickname, AgeGroup ageGroup) {
         return new Child(user, nickname, ageGroup);
     }
+
+    public static Child create(User user, String nickname, AgeGroup ageGroup, MoyaType moyaType) {
+        Child child = new Child(user, nickname, ageGroup);
+        child.moyaType = moyaType;
+        return child;
+    }
 }
