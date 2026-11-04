@@ -59,4 +59,10 @@ public class Child extends BaseTimeEntity {
         child.moyaType = moyaType;
         return child;
     }
+
+    public void updateProfile(String nickname, AgeGroup ageGroup, MoyaType moyaType) {
+        this.nickname = nickname;
+        this.ageGroup = ageGroup;
+        this.moyaType = moyaType;
+    }
 }
