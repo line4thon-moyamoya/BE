@@ -1,0 +1,32 @@
+package com.moyamoya.domain.wordbook.service;
+
+import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.word.repository.LearnedWordRepository;
+import com.moyamoya.domain.wordbook.dto.response.LearnedWordResponse;
+import com.moyamoya.domain.wordbook.dto.response.WordbookResponse;
+import com.moyamoya.domain.wordbook.exception.WordbookErrorCode;
+import com.moyamoya.global.exception.CustomException;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class WordbookService {
+    private final ChildRepository childRepository;
+    private final LearnedWordRepository learnedWordRepository;
+
+    @Transactional(readOnly = true)
+    public WordbookResponse getWordbook(Long userId, Long childId) {
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new CustomException(WordbookErrorCode.CHILD_NOT_FOUND));
+        if (!child.getUser().getId().equals(userId)) {
+            throw new CustomException(WordbookErrorCode.CHILD_ACCESS_DENIED);
+        }
+        List<LearnedWordResponse> cards = learnedWordRepository.findAllWithWordByChildId(childId)
+                .stream().map(LearnedWordResponse::from).toList();
+        return new WordbookResponse(cards.size(), cards);
+    }
+}
