@@ -44,30 +44,19 @@ public class ChildService {
             if (request.getNickname() == null) {
                 throw new CustomException(ChildErrorCode.INVALID_NICKNAME);
             }
-            nickname = request.getNickname().trim();
-            if (nickname.isBlank() || nickname.codePointCount(0, nickname.length()) > 50) {
-                throw new CustomException(ChildErrorCode.INVALID_NICKNAME);
-            }
+            nickname = validateNickname(request.getNickname());
         }
         if (request.hasAgeGroup()) {
             if (request.getAgeGroup() == null) {
                 throw new CustomException(ChildErrorCode.INVALID_AGE_GROUP);
             }
-            try {
-                ageGroup = AgeGroup.valueOf(request.getAgeGroup());
-            } catch (IllegalArgumentException exception) {
-                throw new CustomException(ChildErrorCode.INVALID_AGE_GROUP);
-            }
+            ageGroup = parseAgeGroup(request.getAgeGroup());
         }
         if (request.hasMoyaType()) {
             if (request.getMoyaType() == null) {
                 throw new CustomException(ChildErrorCode.INVALID_MOYA_TYPE);
             }
-            try {
-                moyaType = MoyaType.valueOf(request.getMoyaType());
-            } catch (IllegalArgumentException exception) {
-                throw new CustomException(ChildErrorCode.INVALID_MOYA_TYPE);
-            }
+            moyaType = parseMoyaType(request.getMoyaType());
         }
         child.updateProfile(nickname, ageGroup, moyaType);
     }
@@ -79,25 +68,37 @@ public class ChildService {
         if (request == null || request.nickname() == null || request.ageGroup() == null) {
             throw new CustomException(ChildErrorCode.INVALID_CREATE_REQUEST);
         }
-        String nickname = request.nickname().trim();
-        if (nickname.isBlank() || nickname.codePointCount(0, nickname.length()) > 50) {
-            throw new CustomException(ChildErrorCode.INVALID_NICKNAME);
-        }
-        AgeGroup ageGroup;
-        try {
-            ageGroup = AgeGroup.valueOf(request.ageGroup());
-        } catch (IllegalArgumentException exception) {
-            throw new CustomException(ChildErrorCode.INVALID_AGE_GROUP);
-        }
+        String nickname = validateNickname(request.nickname());
+        AgeGroup ageGroup = parseAgeGroup(request.ageGroup());
         MoyaType moyaType = MoyaType.DEFAULT;
         if (request.moyaType() != null) {
-            try {
-                moyaType = MoyaType.valueOf(request.moyaType());
-            } catch (IllegalArgumentException exception) {
-                throw new CustomException(ChildErrorCode.INVALID_MOYA_TYPE);
-            }
+            moyaType = parseMoyaType(request.moyaType());
         }
         Child child = childRepository.save(Child.create(user, nickname, ageGroup, moyaType));
         return ChildResponse.from(child);
+    }
+
+    private String validateNickname(String value) {
+        String nickname = value.trim();
+        if (nickname.isBlank() || nickname.codePointCount(0, nickname.length()) > 50) {
+            throw new CustomException(ChildErrorCode.INVALID_NICKNAME);
+        }
+        return nickname;
+    }
+
+    private AgeGroup parseAgeGroup(String value) {
+        try {
+            return AgeGroup.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(ChildErrorCode.INVALID_AGE_GROUP);
+        }
+    }
+
+    private MoyaType parseMoyaType(String value) {
+        try {
+            return MoyaType.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(ChildErrorCode.INVALID_MOYA_TYPE);
+        }
     }
 }
