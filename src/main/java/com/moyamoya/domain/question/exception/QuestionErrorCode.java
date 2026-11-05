@@ -67,6 +67,12 @@ public enum QuestionErrorCode implements BaseErrorCode {
             "QUESTION502_STT_FAILED",
             "음성 인식 서비스에 문제가 발생했습니다.",
             HttpStatus.BAD_GATEWAY
+    ),
+
+    TTS_GENERATION_FAILED(
+            "QUESTION502_TTS_FAILED",
+            "음성 생성 서비스에 문제가 발생했습니다.",
+            HttpStatus.BAD_GATEWAY
     );
 
     private final String code;

@@ -77,7 +77,7 @@ public class QuestionConfirmService {
             WordCandidate candidate = session
                     .findCurrentCandidate(candidateId)
                     .orElseThrow(() -> new CustomException(
-                            QuestionErrorCode.INVALID_QUESTION_REQUEST
+                            QuestionErrorCode.INVALID_CANDIDATE
                     ));
 
             // 기존 단어 재사용 또는 신규 외부 단어 생성
@@ -86,10 +86,14 @@ public class QuestionConfirmService {
 
             // 음성이 없는 경우 S3 저장
             // 기존 단어는 이미 저장된 음성 재사용
-            candidateTtsService.ensureStoredAudio(
-                    word,
-                    child.getAgeGroup()
-            );
+            try {
+                candidateTtsService.ensureStoredAudio(
+                        word,
+                        child.getAgeGroup()
+                );
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+            }
 
             // 질문 기록 저장 (기본/외부 단어 공통)
             QuestionHistory history = QuestionHistory.create(
@@ -190,13 +194,22 @@ public class QuestionConfirmService {
             return null;
         }
 
-        byte[] wav = Base64.getDecoder().decode(audioBase64);
+        byte[] wav;
+        try {
+            wav = Base64.getDecoder().decode(audioBase64);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(QuestionErrorCode.INVALID_CANDIDATE);
+        }
 
         String key = "words/external/"
                 + UUID.randomUUID()
                 + "/" + type + ".wav";
 
-        return s3AudioService.uploadWav(key, wav);
+        try {
+            return s3AudioService.uploadWav(key, wav);
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+        }
     }
 
     private UUID parseSessionId(String sessionId) {

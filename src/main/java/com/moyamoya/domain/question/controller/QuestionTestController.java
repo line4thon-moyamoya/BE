@@ -1,3 +1,4 @@
+// 1, 2차 후보 탐색 테스트용 api(텍스트로)
 package com.moyamoya.domain.question.controller;
 
 import com.moyamoya.domain.question.dto.request.SecondCandidateTestRequest;

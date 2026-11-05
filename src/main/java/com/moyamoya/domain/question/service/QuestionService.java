@@ -109,14 +109,19 @@ public class QuestionService {
                     candidates,
                     session.getChildId()
             );
-            List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(
-                    enrichedCandidates,
-                    session.getChildId()
-            );
+            List<WordCandidate> candidatesWithTts;
+            try {
+                candidatesWithTts = enrichCandidatesWithTts(
+                        enrichedCandidates,
+                        session.getChildId()
+                );
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+            }
 
             try {
                 session.setSecondCandidates(context, candidatesWithTts);
-            } catch (IllegalStateException exception) {
+            } catch (IllegalArgumentException | IllegalStateException exception) {
                 throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
             }
             sessionStore.save(session);
@@ -158,18 +163,31 @@ public class QuestionService {
 
         List<String> expressions = josaGenerator.generate(recognizedText);
 
-        session.setExtractionResult(recognizedText, expressions);
+        try {
+            session.setExtractionResult(recognizedText, expressions);
 
-        rankingService.resolveTargetPronunciation(expressions)
-                .ifPresent(session::updateTargetPronunciation);
+            rankingService.resolveTargetPronunciation(expressions)
+                    .ifPresent(session::updateTargetPronunciation);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+        } catch (IllegalStateException exception) {
+            throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+        }
 
         List<WordCandidate> candidates = rankingService.rankFirst(expressions);
         List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
-        List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(
-                enrichedCandidates,
-                childId
-        );
-        session.setFirstCandidates(candidatesWithTts);
+        List<WordCandidate> candidatesWithTts;
+        try {
+            candidatesWithTts = enrichCandidatesWithTts(
+                    enrichedCandidates,
+                    childId
+            );
+            session.setFirstCandidates(candidatesWithTts);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+        } catch (IllegalStateException exception) {
+            throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+        }
 
         sessionStore.save(session);
 
@@ -181,8 +199,13 @@ public class QuestionService {
         }
 
         String dialogueText = QuestionCandidateResponse.buildDialogue(response.candidates());
-        byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
-        String dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+        String dialogueAudioBase64;
+        try {
+            byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
+            dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+        }
 
         return QuestionCandidateResponse.of(
                 session,

@@ -1,6 +1,7 @@
 package com.moyamoya.domain.question.service;
 
 import com.moyamoya.domain.question.extractor.JosaCandidateGenerator;
+import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.extractor.QuestionTargetExtractor;
 import com.moyamoya.domain.question.model.QuestionExtractionResult;
 import com.moyamoya.domain.question.model.WordCandidate;
@@ -14,6 +15,7 @@ import com.moyamoya.domain.word.entity.HeardFrom;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
+import com.moyamoya.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.moyamoya.domain.child.entity.AgeGroup;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -163,6 +166,101 @@ class QuestionServiceTest {
         assertThat(response.status()).isEqualTo("CANDIDATES_FOUND");
         assertThat(response.candidates()).hasSize(1);
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
+    }
+
+    @Test
+    void testSttThrowsTtsGenerationFailedWhenDialogueTtsFails() {
+        when(targetExtractor.extract("엄마, 데금이 뭐야?"))
+                .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
+        when(josaGenerator.generate("데금이"))
+                .thenReturn(List.of("데금이", "데금"));
+        when(rankingService.rankFirst(List.of("데금이", "데금")))
+                .thenReturn(List.of(new WordCandidate(
+                        "CURATED:세금",
+                        null,
+                        "세금",
+                        WordSourceType.CURATED,
+                        0.92,
+                        0.0,
+                        0.92,
+                        "기존정의",
+                        null,
+                        null,
+                        null
+                )));
+        when(rankingService.resolveTargetPronunciation(any()))
+                .thenReturn(Optional.empty());
+        stubChildOwnership(1L, 1L);
+        when(wordRepository.findByWord("세금")).thenReturn(Optional.empty());
+        when(moyaTtsService.synthesize(any()))
+                .thenThrow(new IllegalStateException("tts failed"));
+
+        assertThatThrownBy(() -> questionService.testStt(1L, "엄마, 데금이 뭐야?"))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void findSecondCandidatesThrowsTtsGenerationFailedWhenCandidateTtsFails() {
+        QuestionSession session = QuestionSession.create(1L, "엄마 저끔이 뭐야?", null);
+        session.setExtractionResult("저끔", List.of("저끔"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "CURATED:적금",
+                null,
+                "적금",
+                WordSourceType.CURATED,
+                0.9,
+                0.0,
+                0.9,
+                "정의",
+                null,
+                null,
+                null
+        )));
+
+        List<WordCandidate> secondCandidates = List.of(new WordCandidate(
+                "CURATED:연금",
+                null,
+                "연금",
+                WordSourceType.CURATED,
+                0.8,
+                0.6,
+                0.75,
+                "정의2",
+                null,
+                null,
+                null
+        ));
+
+        Word existingWord = mock(Word.class);
+        when(existingWord.getDescriptionAudioAge3To4Url()).thenReturn("desc-key");
+        when(existingWord.getWordAudioUrl()).thenReturn("word-key");
+        when(existingWord.getId()).thenReturn(100L);
+        when(existingWord.getSourceType()).thenReturn(WordSourceType.CURATED);
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        stubChildOwnership(1L, 1L);
+        when(rankingService.rankSecond(
+                List.of("저끔"),
+                "엄마 저끔이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of("CURATED:적금")
+        )).thenReturn(secondCandidates);
+        when(wordRepository.findByWord("연금")).thenReturn(Optional.of(existingWord));
+        when(candidateTtsService.resolveAudioUrl(any())).thenReturn("https://audio.example");
+        org.mockito.Mockito.doThrow(new IllegalStateException("tts failed"))
+                .when(candidateTtsService)
+                .ensureStoredAudio(any(), any());
+
+        assertThatThrownBy(() -> questionService.findSecondCandidates(
+                1L,
+                session.getSessionId().toString(),
+                HeardFrom.PARENTS
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
     }
 
     private void stubChildOwnership(Long userId, Long childId) {
