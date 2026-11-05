@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -38,6 +39,8 @@ public class QuestionService {
     private final JosaCandidateGenerator josaGenerator;
     private final CandidateRankingService rankingService;
     private final SttService sttService;
+    private final CandidateTtsService candidateTtsService;
+    private final MoyaTtsService moyaTtsService;
     private final QuestionSessionStore sessionStore;
     private final WordRepository wordRepository;
     private final ChildRepository childRepository;
@@ -106,9 +109,10 @@ public class QuestionService {
                     candidates,
                     session.getChildId()
             );
+            List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(enrichedCandidates);
 
             try {
-                session.setSecondCandidates(context, enrichedCandidates);
+                session.setSecondCandidates(context, candidatesWithTts);
             } catch (IllegalStateException exception) {
                 throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
             }
@@ -158,13 +162,27 @@ public class QuestionService {
 
         List<WordCandidate> candidates = rankingService.rankFirst(expressions);
         List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
-        session.setFirstCandidates(enrichedCandidates);
+        List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(enrichedCandidates);
+        session.setFirstCandidates(candidatesWithTts);
 
         sessionStore.save(session);
 
-        String analysisType = determineAnalysisType(session, enrichedCandidates);
+        String analysisType = determineAnalysisType(session, candidatesWithTts);
+        QuestionCandidateResponse response = QuestionCandidateResponse.of(session, analysisType);
 
-        return QuestionCandidateResponse.of(session, analysisType);
+        if (response.candidateCount() == 0) {
+            return response;
+        }
+
+        String dialogueText = QuestionCandidateResponse.buildDialogue(response.candidates());
+        byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
+        String dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+
+        return QuestionCandidateResponse.of(
+                session,
+                analysisType,
+                dialogueAudioBase64
+        );
     }
 
     private UUID parseSessionId(String sessionId) {
@@ -235,6 +253,40 @@ public class QuestionService {
                             word.getImageUrl() != null ? word.getImageUrl() : candidate.imageUrl(),
                             word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
                             descriptionAudioUrl != null ? descriptionAudioUrl : candidate.descriptionAudioUrl()
+                    );
+                })
+                .toList();
+    }
+
+    private List<WordCandidate> enrichCandidatesWithTts(
+            List<WordCandidate> candidates
+    ) {
+        return candidates.stream()
+                .map(candidate -> {
+                    String wordAudioBase64 = candidateTtsService.generateBase64IfNeeded(
+                            candidate.word(),
+                            candidate.wordAudioUrl()
+                    );
+
+                    String descriptionAudioBase64 = candidateTtsService.generateBase64IfNeeded(
+                            candidate.definition(),
+                            candidate.descriptionAudioUrl()
+                    );
+
+                    return new WordCandidate(
+                            candidate.candidateId(),
+                            candidate.wordId(),
+                            candidate.word(),
+                            candidate.sourceType(),
+                            candidate.pronunciationScore(),
+                            candidate.contextScore(),
+                            candidate.finalScore(),
+                            candidate.definition(),
+                            candidate.imageUrl(),
+                            candidate.wordAudioUrl(),
+                            candidate.descriptionAudioUrl(),
+                            wordAudioBase64,
+                            descriptionAudioBase64
                     );
                 })
                 .toList();

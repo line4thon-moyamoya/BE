@@ -20,13 +20,22 @@ public record QuestionCandidateResponse(
 ) {
     public record Dialogue(
             String text,
-            String audioUrl
+            String audioUrl,
+            String audioBase64
     ) {
     }
 
     public static QuestionCandidateResponse of(
             QuestionSession session,
             String analysisType
+    ) {
+        return of(session, analysisType, null);
+    }
+
+    public static QuestionCandidateResponse of(
+            QuestionSession session,
+            String analysisType,
+            String dialogueAudioBase64
     ) {
         List<WordCandidate> sourceCandidates = switch (session.getStatus()) {
             case SECOND_CANDIDATES_READY, SECOND_NO_CANDIDATES -> session.getSecondCandidatesForClient();
@@ -50,7 +59,7 @@ public record QuestionCandidateResponse(
                 session.getTargetPronunciation(),
                 candidates.size(),
                 candidates,
-                found ? new Dialogue(buildDialogue(candidates), null) : null,
+                found ? new Dialogue(buildDialogue(candidates), null, dialogueAudioBase64) : null,
                 found ? "CANDIDATE_SELECTION" : "ASK_HEARD_FROM"
         );
     }
@@ -62,7 +71,7 @@ public record QuestionCandidateResponse(
         return of(session, analysisType);
     }
 
-    private static String buildDialogue(List<CandidateResponse> candidates) {
+    public static String buildDialogue(List<CandidateResponse> candidates) {
         if (candidates.size() == 1) {
             return candidates.getFirst().word() + " 말하는 거야?";
         }

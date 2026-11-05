@@ -33,6 +33,8 @@ class QuestionServiceTest {
     private JosaCandidateGenerator josaGenerator;
     private CandidateRankingService rankingService;
     private SttService sttService;
+    private CandidateTtsService candidateTtsService;
+    private MoyaTtsService moyaTtsService;
     private QuestionSessionStore sessionStore;
     private WordRepository wordRepository;
     private ChildRepository childRepository;
@@ -45,6 +47,8 @@ class QuestionServiceTest {
         josaGenerator = mock(JosaCandidateGenerator.class);
         rankingService = mock(CandidateRankingService.class);
         sttService = mock(SttService.class);
+        candidateTtsService = mock(CandidateTtsService.class);
+        moyaTtsService = mock(MoyaTtsService.class);
         sessionStore = mock(QuestionSessionStore.class);
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
@@ -55,11 +59,16 @@ class QuestionServiceTest {
                 josaGenerator,
                 rankingService,
                 sttService,
+                candidateTtsService,
+                moyaTtsService,
                 sessionStore,
                 wordRepository,
                 childRepository,
                 userRepository
         );
+
+        when(moyaTtsService.synthesize(any()))
+                .thenReturn(new byte[]{1, 2, 3});
     }
 
     @Test

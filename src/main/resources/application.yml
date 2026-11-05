@@ -32,3 +32,8 @@ clova:
     invoke-url: ${CLOVA_SPEECH_INVOKE_URL}
     secret-key: ${CLOVA_SPEECH_SECRET_KEY}
 
+google:
+  tts:
+    language-code: ko-KR
+    voice-name: ko-KR-Chirp3-HD-Leda
+
