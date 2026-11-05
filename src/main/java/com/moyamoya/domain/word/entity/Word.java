@@ -105,4 +105,38 @@ public class Word extends BaseTimeEntity {
 
         return newWord;
     }
+
+    // CSV 기본 단어 시딩용
+    public static Word createCurated(
+            String word,
+            String definition,
+            String category,
+            String descAge3To4,
+            String descAge5,
+            String example,
+            String hint,
+            String songDescription
+    ) {
+        Word newWord = new Word();
+
+        newWord.word = word;
+        newWord.definition = definition;
+        newWord.category = category;
+        newWord.descAge3To4 = descAge3To4;
+        newWord.descAge5 = descAge5;
+        newWord.example = example;
+        newWord.hint = hint;
+        newWord.songDescription = songDescription;
+
+        // 기본 단어
+        newWord.sourceType = WordSourceType.CURATED;
+
+        // 음성 및 이미지는 추후 생성
+        newWord.imageUrl = null;
+        newWord.wordAudioUrl = null;
+        newWord.descriptionAudioAge3To4Url = null;
+        newWord.descriptionAudioAge5Url = null;
+
+        return newWord;
+    }
 }
