@@ -5,10 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Component
 public class PronunciationVariantGenerator {
@@ -55,6 +52,76 @@ public class PronunciationVariantGenerator {
         }
 
         return List.copyOf(variants);
+    }
+
+    // 생성된 발음과 적용 규칙 정보를 함께 반환
+    public record PronunciationVariant(
+            String pronunciation,
+            String ruleId,
+            String priority
+    ) {}
+
+    // 규칙별 예상 발음 생성 (원본은 포함하지 않음)
+    public List<PronunciationVariant> generateDetailed(String word) {
+        if (word == null || word.isBlank()) {
+            return List.of();
+        }
+
+        String original = word.trim();
+        JsonNode rules = dataLoader.getPronunciationRules()
+                .path("rules");
+
+        // 같은 발음이 여러 규칙으로 생성되면 우선순위가 높은 규칙 유지
+        Map<String, PronunciationVariant> results =
+                new LinkedHashMap<>();
+
+        for (JsonNode rule : rules) {
+            if (!rule.path("enabled").asBoolean(false)) {
+                continue;
+            }
+
+            String ruleId = rule.path("id").asText("");
+            String priority = rule.path("priority")
+                    .asText("MEDIUM")
+                    .toUpperCase(Locale.ROOT);
+
+            // 기존 발음 변형 로직 재사용
+            Set<String> generated = new LinkedHashSet<>();
+            applyRule(original, rule, generated);
+
+            for (String pronunciation : generated) {
+                if (pronunciation.equals(original)) {
+                    continue;
+                }
+
+                PronunciationVariant candidate =
+                        new PronunciationVariant(
+                                pronunciation,
+                                ruleId,
+                                priority
+                        );
+
+                PronunciationVariant previous =
+                        results.get(pronunciation);
+
+                if (previous == null ||
+                        priorityRank(priority)
+                                > priorityRank(previous.priority())) {
+                    results.put(pronunciation, candidate);
+                }
+            }
+        }
+
+        return List.copyOf(results.values());
+    }
+
+    private int priorityRank(String priority) {
+        return switch (priority) {
+            case "HIGH" -> 3;
+            case "MEDIUM" -> 2;
+            case "LOW" -> 1;
+            default -> 0;
+        };
     }
 
     private void applyRule(

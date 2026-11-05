@@ -1,3 +1,4 @@
+// 조사 포함해서 질문에서 표현 추출
 package com.moyamoya.domain.question.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;

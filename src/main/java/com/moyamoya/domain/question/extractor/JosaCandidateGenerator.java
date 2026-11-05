@@ -1,3 +1,4 @@
+// 조사 제거 및 후보 형태 생성
 package com.moyamoya.domain.question.extractor;
 
 import com.fasterxml.jackson.databind.JsonNode;
