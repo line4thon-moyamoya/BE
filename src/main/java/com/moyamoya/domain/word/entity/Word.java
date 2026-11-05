@@ -115,7 +115,8 @@ public class Word extends BaseTimeEntity {
             String descAge5,
             String example,
             String hint,
-            String songDescription
+            String songDescription,
+            HeardFrom heardFrom
     ) {
         Word newWord = new Word();
 
@@ -127,6 +128,7 @@ public class Word extends BaseTimeEntity {
         newWord.example = example;
         newWord.hint = hint;
         newWord.songDescription = songDescription;
+        newWord.heardFrom = heardFrom;
 
         // 기본 단어
         newWord.sourceType = WordSourceType.CURATED;

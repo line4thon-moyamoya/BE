@@ -2,8 +2,10 @@ package com.moyamoya.domain.word.init;
 
 import com.moyamoya.domain.question.config.QuestionDataLoader;
 import com.moyamoya.domain.question.model.QuestionWordData;
+import com.moyamoya.domain.word.entity.HeardFrom;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
+import com.moyamoya.domain.word.util.HeardFromMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,8 @@ public class WordSeeder implements ApplicationRunner {
                 continue;
             }
 
+            HeardFrom heardFrom = HeardFromMapper.fromCsv(data.heardFrom());
+
             // CSV 데이터 -> Word 엔티티
             Word newWord = Word.createCurated(
                     word,
@@ -50,7 +54,8 @@ public class WordSeeder implements ApplicationRunner {
                     data.descAge5(),
                     data.example(),
                     data.hint(),
-                    data.songLine()
+                    data.songLine(),
+                    heardFrom
             );
 
             wordRepository.save(newWord);
