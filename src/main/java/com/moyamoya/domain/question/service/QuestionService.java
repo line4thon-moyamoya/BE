@@ -10,6 +10,7 @@ import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.question.session.QuestionSession;
 import com.moyamoya.domain.question.session.QuestionSessionStore;
 import com.moyamoya.domain.question.session.QuestionSessionStatus;
+import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.exception.ChildErrorCode;
 import com.moyamoya.domain.child.repository.ChildRepository;
@@ -95,14 +96,17 @@ public class QuestionService {
                 excludedKeys
         );
 
-        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates);
+        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(
+                candidates,
+                session.getChildId()
+        );
 
         session.setSecondCandidates(context, enrichedCandidates);
         sessionStore.save(session);
 
         return SecondCandidateResponse.of(
                 session.getSessionId().toString(),
-                enrichedCandidates
+                session.getSecondCandidatesForClient()
         );
     }
 
@@ -142,14 +146,14 @@ public class QuestionService {
                 .ifPresent(session::updateTargetPronunciation);
 
         List<WordCandidate> candidates = rankingService.rankFirst(expressions);
-        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates);
+        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
         session.setFirstCandidates(enrichedCandidates);
 
         sessionStore.save(session);
 
         String analysisType = determineAnalysisType(session, enrichedCandidates);
 
-        return QuestionCandidateResponse.forTest(session, analysisType);
+        return QuestionCandidateResponse.of(session, analysisType);
     }
 
     private UUID parseSessionId(String sessionId) {
@@ -182,8 +186,11 @@ public class QuestionService {
     }
 
     private List<WordCandidate> enrichCandidatesWithWordData(
-            List<WordCandidate> candidates
+            List<WordCandidate> candidates,
+            Long childId
     ) {
+        AgeGroup ageGroup = resolveChildAgeGroup(childId);
+
         return candidates.stream()
                 .map(candidate -> {
                     Word word = wordRepository.findByWord(candidate.word())
@@ -193,19 +200,43 @@ public class QuestionService {
                         return candidate;
                     }
 
+                    String ageDescription = ageGroup == AgeGroup.AGE_3_4
+                            ? word.getDescAge3To4()
+                            : word.getDescAge5();
+
+                    String descriptionAudioUrl = ageGroup == AgeGroup.AGE_3_4
+                            ? word.getDescriptionAudioAge3To4Url()
+                            : word.getDescriptionAudioAge5Url();
+
+                    String resolvedDescription = hasText(ageDescription)
+                            ? ageDescription
+                            : (word.getDefinition() != null ? word.getDefinition() : candidate.definition());
+
                     return new WordCandidate(
                             candidate.candidateId(),
                             word.getId(),
                             candidate.word(),
-                            candidate.sourceType(),
+                            word.getSourceType() != null ? word.getSourceType() : candidate.sourceType(),
                             candidate.pronunciationScore(),
                             candidate.contextScore(),
                             candidate.finalScore(),
-                            word.getDefinition() != null ? word.getDefinition() : candidate.definition(),
-                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl()
+                            resolvedDescription,
+                            word.getImageUrl() != null ? word.getImageUrl() : candidate.imageUrl(),
+                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
+                            descriptionAudioUrl != null ? descriptionAudioUrl : candidate.descriptionAudioUrl()
                     );
                 })
                 .toList();
+    }
+
+    private AgeGroup resolveChildAgeGroup(Long childId) {
+        return childRepository.findById(childId)
+                .map(Child::getAgeGroup)
+                .orElse(AgeGroup.AGE_5);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String determineAnalysisType(

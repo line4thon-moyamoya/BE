@@ -74,6 +74,8 @@ class QuestionServiceTest {
                         0.0,
                         0.92,
                         "기존정의",
+                        null,
+                        null,
                         null
                 )));
         when(rankingService.resolveTargetPronunciation(any()))
@@ -83,6 +85,8 @@ class QuestionServiceTest {
         Word word = mock(Word.class);
         when(word.getId()).thenReturn(42L);
         when(word.getDefinition()).thenReturn("나라에 내는 돈");
+        when(word.getDescAge3To4()).thenReturn("나라에 내는 돈(3-4)");
+        when(word.getSourceType()).thenReturn(WordSourceType.CURATED);
         when(word.getWordAudioUrl()).thenReturn("https://cdn/audio/word-tax.mp3");
         when(wordRepository.findByWord("세금")).thenReturn(Optional.of(word));
 
@@ -90,8 +94,9 @@ class QuestionServiceTest {
 
         assertThat(response.candidates()).hasSize(1);
         assertThat(response.candidates().getFirst().wordId()).isEqualTo(42L);
-        assertThat(response.candidates().getFirst().description()).isEqualTo("나라에 내는 돈");
+        assertThat(response.candidates().getFirst().description()).isEqualTo("나라에 내는 돈(3-4)");
         assertThat(response.candidates().getFirst().wordAudioUrl()).isEqualTo("https://cdn/audio/word-tax.mp3");
+        assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
     }
 
     @Test
@@ -107,6 +112,8 @@ class QuestionServiceTest {
                 0.0,
                 0.9,
                 "정의",
+                null,
+                null,
                 null
         )));
 
@@ -119,6 +126,8 @@ class QuestionServiceTest {
                 0.6,
                 0.75,
                 "정의2",
+                null,
+                null,
                 null
         ));
 
@@ -140,7 +149,7 @@ class QuestionServiceTest {
 
         assertThat(response.status()).isEqualTo("CANDIDATES_FOUND");
         assertThat(response.candidates()).hasSize(1);
-        assertThat(response.candidates().getFirst().candidateId()).isEqualTo("CURATED:연금");
+        assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
     }
 
     private void stubChildOwnership(Long userId, Long childId) {

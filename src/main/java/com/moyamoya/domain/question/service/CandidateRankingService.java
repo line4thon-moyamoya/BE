@@ -529,6 +529,8 @@ public class CandidateRankingService {
                 0.0, // F2-2에서 문맥 점수 연결
                 score,
                 data.definition(),
+                null,
+                null,
                 null
         );
     }
@@ -558,6 +560,8 @@ public class CandidateRankingService {
                 combinedContextScore,
                 scored.finalScore(),
                 data.definition(),
+                null,
+                null,
                 null
         );
     }

@@ -8,20 +8,23 @@ public record SecondCandidateResponse(
         String sessionId,
         String status,
         int candidateCount,
-        List<WordCandidate> candidates,
+        List<CandidateResponse> candidates,
         String nextStep
 ) {
     public static SecondCandidateResponse of(
             String sessionId,
             List<WordCandidate> candidates
     ) {
-        boolean found = !candidates.isEmpty();
+        List<CandidateResponse> responses = candidates.stream()
+                .map(CandidateResponse::from)
+                .toList();
+        boolean found = !responses.isEmpty();
 
         return new SecondCandidateResponse(
                 sessionId,
                 found ? "CANDIDATES_FOUND" : "NO_CANDIDATE",
-                candidates.size(),
-                candidates,
+                responses.size(),
+                responses,
                 found ? "FINAL_CANDIDATE_SELECTION" : "WORD_REQUEST"
         );
     }

@@ -263,6 +263,8 @@ class QuestionSessionTest {
                 0.8,
                 0.8,
                 "뜻",
+                null,
+                null,
                 null
         );
     }

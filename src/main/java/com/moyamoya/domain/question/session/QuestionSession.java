@@ -32,6 +32,8 @@ public class QuestionSession {
     // 1차 및 2차 후보
     private List<WordCandidate> firstCandidates = List.of();
     private List<WordCandidate> secondCandidates = List.of();
+    private Map<String, String> firstPublicCandidateIdMap = Map.of();
+    private Map<String, String> secondPublicCandidateIdMap = Map.of();
 
     // 1차에서 보여준 단어 (2차에서 제외)
     private Set<String> excludedWords = Set.of();
@@ -135,6 +137,8 @@ public class QuestionSession {
         requireStatus(QuestionSessionStatus.PROCESSING);
 
         this.firstCandidates = List.copyOf(candidates);
+        this.firstPublicCandidateIdMap = buildPublicCandidateIdMap(this.firstCandidates);
+        this.secondPublicCandidateIdMap = Map.of();
 
         this.status = candidates.isEmpty()
                 ? QuestionSessionStatus.FIRST_NO_CANDIDATES
@@ -175,6 +179,7 @@ public class QuestionSession {
         this.heardFrom = heardFrom;
         this.excludedWords = Set.copyOf(excluded);
         this.secondCandidates = List.copyOf(candidates);
+        this.secondPublicCandidateIdMap = buildPublicCandidateIdMap(this.secondCandidates);
 
         // 후보가 없으면 별도 상태로 구분
         this.status = candidates.isEmpty()
@@ -189,18 +194,34 @@ public class QuestionSession {
             String candidateId
     ) {
         List<WordCandidate> currentCandidates;
+        Map<String, String> currentPublicCandidateIdMap;
 
         if (status == QuestionSessionStatus.FIRST_CANDIDATES_READY) {
             currentCandidates = firstCandidates;
+            currentPublicCandidateIdMap = firstPublicCandidateIdMap;
         } else if (status == QuestionSessionStatus.SECOND_CANDIDATES_READY) {
             currentCandidates = secondCandidates;
+            currentPublicCandidateIdMap = secondPublicCandidateIdMap;
         } else {
             return Optional.empty();
         }
 
+        String internalCandidateId = currentPublicCandidateIdMap.getOrDefault(
+                candidateId,
+                candidateId
+        );
+
         return currentCandidates.stream()
-                .filter(candidate -> candidate.candidateId().equals(candidateId))
+                .filter(candidate -> candidate.candidateId().equals(internalCandidateId))
                 .findFirst();
+    }
+
+    public synchronized List<WordCandidate> getFirstCandidatesForClient() {
+        return toClientCandidates(firstCandidates, firstPublicCandidateIdMap);
+    }
+
+    public synchronized List<WordCandidate> getSecondCandidatesForClient() {
+        return toClientCandidates(secondCandidates, secondPublicCandidateIdMap);
     }
 
     // 단어 확정 완료 후 호출
@@ -256,5 +277,46 @@ public class QuestionSession {
 
     private void touch() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+    private Map<String, String> buildPublicCandidateIdMap(List<WordCandidate> candidates) {
+        if (candidates == null || candidates.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, String> mapping = new LinkedHashMap<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            String publicId = "c_%03d".formatted(i + 1);
+            mapping.put(publicId, candidates.get(i).candidateId());
+        }
+        return Map.copyOf(mapping);
+    }
+
+    private List<WordCandidate> toClientCandidates(
+            List<WordCandidate> internalCandidates,
+            Map<String, String> publicCandidateIdMap
+    ) {
+        if (internalCandidates == null || internalCandidates.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, String> internalToPublicMap = new HashMap<>();
+        publicCandidateIdMap.forEach((publicId, internalId) -> internalToPublicMap.put(internalId, publicId));
+
+        return internalCandidates.stream()
+                .map(candidate -> new WordCandidate(
+                        internalToPublicMap.getOrDefault(candidate.candidateId(), candidate.candidateId()),
+                        candidate.wordId(),
+                        candidate.word(),
+                        candidate.sourceType(),
+                        candidate.pronunciationScore(),
+                        candidate.contextScore(),
+                        candidate.finalScore(),
+                        candidate.definition(),
+                        candidate.imageUrl(),
+                        candidate.wordAudioUrl(),
+                        candidate.descriptionAudioUrl()
+                ))
+                .toList();
     }
 }

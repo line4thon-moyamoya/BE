@@ -14,38 +14,27 @@ public record QuestionCandidateResponse(
         String recognizedText,
         String extractedWord,
         int candidateCount,
-        List<Candidate> candidates,
+        List<CandidateResponse> candidates,
         Dialogue dialogue,
         String nextStep
 ) {
-    public record Candidate(
-            String candidateId,
-            Long wordId,
-            String word,
-            String description,
-            String imageUrl,
-            String wordAudioUrl,
-            String descriptionAudioUrl
-    ) {
-    }
-
     public record Dialogue(
             String text,
             String audioUrl
     ) {
     }
 
-    public static QuestionCandidateResponse forTest(
+    public static QuestionCandidateResponse of(
             QuestionSession session,
             String analysisType
     ) {
         List<WordCandidate> sourceCandidates = switch (session.getStatus()) {
-            case SECOND_CANDIDATES_READY, SECOND_NO_CANDIDATES -> session.getSecondCandidates();
-            default -> session.getFirstCandidates();
+            case SECOND_CANDIDATES_READY, SECOND_NO_CANDIDATES -> session.getSecondCandidatesForClient();
+            default -> session.getFirstCandidatesForClient();
         };
 
-        List<Candidate> candidates = sourceCandidates.stream()
-                .map(QuestionCandidateResponse::toCandidate)
+        List<CandidateResponse> candidates = sourceCandidates.stream()
+                .map(CandidateResponse::from)
                 .toList();
 
         boolean found = session.getStatus() == QuestionSessionStatus.FIRST_CANDIDATES_READY
@@ -66,26 +55,21 @@ public record QuestionCandidateResponse(
         );
     }
 
-    private static Candidate toCandidate(WordCandidate candidate) {
-        return new Candidate(
-                candidate.candidateId(),
-                candidate.wordId(),
-                candidate.word(),
-                candidate.definition(),
-                null,
-                candidate.wordAudioUrl(),
-                null
-        );
+    public static QuestionCandidateResponse forTest(
+            QuestionSession session,
+            String analysisType
+    ) {
+        return of(session, analysisType);
     }
 
-    private static String buildDialogue(List<Candidate> candidates) {
+    private static String buildDialogue(List<CandidateResponse> candidates) {
         if (candidates.size() == 1) {
-            return candidates.get(0).word() + " 말하는 거야?";
+            return candidates.getFirst().word() + " 말하는 거야?";
         }
 
         String words = String.join(
                 "? ",
-                candidates.stream().map(Candidate::word).toList()
+                candidates.stream().map(CandidateResponse::word).toList()
         );
 
         return words + "? 어떤 거야?";

@@ -11,6 +11,8 @@ public record WordCandidate(
         double contextScore,
         double finalScore,
         String definition,
-        String wordAudioUrl
+        String imageUrl,
+        String wordAudioUrl,
+        String descriptionAudioUrl
 ) {
 }
