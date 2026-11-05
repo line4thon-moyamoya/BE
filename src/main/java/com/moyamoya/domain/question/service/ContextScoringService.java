@@ -22,10 +22,7 @@ public class ContextScoringService {
             "이거", "저거", "단어", "뜻"
     );
 
-    /**
-     * STT 원문과 단어 메타데이터의 문맥 유사도 계산
-     * 반환값: 0.0 ~ 1.0
-     */
+    // STT 원문과 단어 메타데이터의 문맥 유사도 계산
     public double calculateContextScore(
             String originalText,
             QuestionWordData data
@@ -72,10 +69,7 @@ public class ContextScoringService {
         return clamp(score);
     }
 
-    /**
-     * 아이가 선택한 출처와 CSV 단어 출처 비교
-     * 일치하면 1.0, 아니면 0.0
-     */
+    // 아이가 선택한 출처와 CSV 단어 출처 비교
     public double calculateSourceScore(
             HeardFrom selectedHeardFrom,
             QuestionWordData data
@@ -91,9 +85,7 @@ public class ContextScoringService {
         ) ? 1.0 : 0.0;
     }
 
-    /**
-     * 입력 문장과 메타데이터 간 키워드 일치율
-     */
+    // 입력 문장과 메타데이터 간 키워드 일치율
     private double overlap(
             Set<String> inputTokens,
             String reference
@@ -124,9 +116,7 @@ public class ContextScoringService {
         );
     }
 
-    /**
-     * 문장을 단어 단위로 분리하고 조사 제거
-     */
+    // 문장을 단어 단위로 분리하고 조사 제거
     private Set<String> tokenize(String text) {
         Set<String> tokens = new HashSet<>();
 
@@ -151,9 +141,7 @@ public class ContextScoringService {
         return tokens;
     }
 
-    /**
-     * 간단한 한국어 조사 제거
-     */
+    // 간단한 조사 제거
     private String removeParticle(String token) {
         String[] particles = {
                 "에서", "에게", "한테", "으로",

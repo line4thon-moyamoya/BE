@@ -60,9 +60,9 @@ public class QuestionController {
                     "word": "적금",
                     "description": "은행에 매달 정해진 돈을 넣어서 크게 모으는 거야.",
                     "imageUrl": null,
-                    "wordAudioUrl": "https://moyamoya-audio-dev-moya.s3.ap-northeast-2.amazonaws.com/words/audio/157/word.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20261105T220143Z&X-Amz-SignedHeaders=host&X-Amz-Credential=AKIA4VI3TKEOB2UYBRFA%2F20261105%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Expires=1800&X-Amz-Signature=b82137d1ff5f79023e80f62964c7080b908b9f354570abb8ceee4038311c2528",
+                    "wordAudioUrl": "https://example.com/presigned-word-audio",
                     "wordAudioBase64": null,
-                    "descriptionAudioUrl": "https://moyamoya-audio-dev-moya.s3.ap-northeast-2.amazonaws.com/words/audio/157/desc-age-5.wav?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20261105T220143Z&X-Amz-SignedHeaders=host&X-Amz-Credential=AKIA4VI3TKEOB2UYBRFA%2F20261105%2Fap-northeast-2%2Fs3%2Faws4_request&X-Amz-Expires=1800&X-Amz-Signature=17b9aed9c0247df818f4e5260c362dc5a9abe7fe7870394cafb51f6e375215b7",
+                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
                     "descriptionAudioBase64": null
                   },
                   {
@@ -71,10 +71,10 @@ public class QuestionController {
                     "word": "예금",
                     "description": "돈을 은행에 맡겨 두었다가 나중에 찾는 거야.",
                     "imageUrl": null,
-                    "wordAudioUrl": null,
-                    "wordAudioBase64": "UklGRiQAAABXQVZF...",
-                    "descriptionAudioUrl": null,
-                    "descriptionAudioBase64": "UklGRiQAAABXQVZF..."
+                    "wordAudioUrl": "https://example.com/presigned-word-audio",
+                    "wordAudioBase64": null,
+                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
+                    "descriptionAudioBase64": null
                   }
                 ],
                 "dialogue": {
@@ -176,10 +176,10 @@ public class QuestionController {
                     "word": "연금",
                     "description": "나중을 위해 모아두는 돈이야.",
                     "imageUrl": "https://cdn.example.com/images/word-112.png",
-                    "wordAudioUrl": null,
-                    "wordAudioBase64": "UklGRiQAAABXQVZF...",
-                    "descriptionAudioUrl": null,
-                    "descriptionAudioBase64": "UklGRiQAAABXQVZF..."
+                    "wordAudioUrl": "https://example.com/presigned-word-audio",
+                    "wordAudioBase64": null,
+                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
+                    "descriptionAudioBase64": null
                   }
                 ],
                 "nextStep": "FINAL_CANDIDATE_SELECTION"
@@ -264,8 +264,8 @@ public class QuestionController {
                 "word": "국회의원",
                 "description": "사람들이 뽑아서 나라의 법을 만들고 정하는 일을 하는 사람이야.",
                 "imageUrl": "https://cdn.example.com/images/word-159.png",
-                "wordAudioUrl": "https://cdn.example.com/audio/word-159.wav",
-                "descriptionAudioUrl": "https://cdn.example.com/audio/word-159-desc.wav",
+                "wordAudioUrl": "https://example.com/presigned-word-audio",
+                "descriptionAudioUrl": "https://example.com/presigned-description-audio",
                 "nextStep": "WORD_LEARNING"
               }
             }

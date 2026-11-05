@@ -1,4 +1,3 @@
-
 package com.moyamoya.domain.question.session;
 
 import com.moyamoya.domain.question.model.WordCandidate;
@@ -243,6 +242,26 @@ class QuestionSessionTest {
         assertThatThrownBy(() ->
                 session.updateTargetPronunciation("구케이원")
         ).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void publicCandidateIdMapsToInternalCandidate() {
+        QuestionSession session = createSession();
+
+        session.setFirstCandidates(
+                List.of(candidate("CURATED:사과", "사과"))
+        );
+
+        // 클라이언트에는 공개 ID 전달
+        assertThat(session.getFirstCandidatesForClient().getFirst().candidateId())
+                .isEqualTo("c_001");
+
+        // 공개 ID로 내부 후보 조회 가능
+        assertThat(session.findCurrentCandidate("c_001"))
+                .isPresent()
+                .get()
+                .extracting(WordCandidate::word)
+                .isEqualTo("사과");
     }
 
     private QuestionSession createSession() {

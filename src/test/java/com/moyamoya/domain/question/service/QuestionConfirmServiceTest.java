@@ -14,6 +14,7 @@ import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.domain.question.session.QuestionSessionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -122,6 +124,48 @@ class QuestionConfirmServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void confirmWordSavesQuestionHistory() {
+        QuestionSession session =
+                QuestionSession.create(1L, "적금이 뭐야", null);
+
+        session.setExtractionResult("적금", List.of("적금"));
+
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "CURATED:적금",
+                10L,
+                "적금",
+                WordSourceType.CURATED,
+                0.9, 0.0, 0.9,
+                "돈을 모으는 방법",
+                null, null, null
+        )));
+
+        Word word = mock(Word.class);
+        when(word.getId()).thenReturn(10L);
+        when(word.getWord()).thenReturn("적금");
+
+        when(sessionStore.find(session.getSessionId()))
+                .thenReturn(Optional.of(session));
+
+        stubChildOwnership(1L, 1L);
+
+        when(wordRepository.findByWord("적금"))
+                .thenReturn(Optional.of(word));
+
+        questionConfirmService.confirmWord(
+                1L,
+                session.getSessionId().toString(),
+                "c_001"
+        );
+
+        assertThat(session.getStatus())
+                .isEqualTo(QuestionSessionStatus.CONFIRMED);
+
+        org.mockito.Mockito.verify(questionHistoryRepository)
+                .save(any());
     }
 
     private void stubChildOwnership(Long userId, Long childId) {
