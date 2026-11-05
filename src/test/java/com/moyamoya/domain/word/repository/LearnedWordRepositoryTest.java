@@ -2,102 +2,104 @@ package com.moyamoya.domain.word.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
 
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
+import com.moyamoya.domain.wordbook.dto.response.LearnedWordResponse;
 import com.moyamoya.domain.wordbook.service.WordbookService;
 import com.moyamoya.global.exception.CustomException;
-import java.time.LocalDateTime;
-import org.hibernate.Hibernate;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@DataJpaTest(properties = "jwt.secret=test-only-secret-key-at-least-32-bytes")
-@Import(WordbookService.class)
+@ExtendWith(MockitoExtension.class)
 class LearnedWordRepositoryTest {
-    @Autowired private WordbookService service;
+    @Mock private ChildRepository childRepository;
+    @Mock private LearnedWordRepository repository;
+    private WordbookService service;
+    private Child child;
 
-    @Test
-    void viewingPersistsNewFlagAndLeavesOtherCardAndStickerUnchanged() {
-        User user = em.persist(User.create("view@example.com", "encoded", "encoded"));
-        Child child = em.persist(Child.create(user, "지우", AgeGroup.AGE_5));
-        LearnedWord card = em.persist(LearnedWord.create(child, word("적금"), true));
-        LearnedWord untouched = em.persist(LearnedWord.create(child, word("자동차"), false));
-        em.flush();
-        em.clear();
-
-        service.markAsViewed(user.getId(), child.getId(), card.getId());
-        em.flush();
-        em.clear();
-        service.markAsViewed(user.getId(), child.getId(), card.getId());
-        em.flush();
-        em.clear();
-
-        LearnedWord stored = repository.findById(card.getId()).orElseThrow();
-        assertThat(stored.isNew()).isFalse();
-        assertThat(stored.isStickerEarned()).isTrue();
-        assertThat(repository.findById(untouched.getId()).orElseThrow().isNew()).isTrue();
-        assertThat(service.getWordbook(user.getId(), child.getId()).learnedWords())
-                .filteredOn(response -> response.learnedWordId().equals(card.getId()))
-                .allSatisfy(response -> assertThat(response.isNew()).isFalse());
+    @BeforeEach
+    void setUp() {
+        service = new WordbookService(childRepository, repository);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(7L);
+        child = Child.create(user, "지우", AgeGroup.AGE_5);
+        when(childRepository.findById(2L)).thenReturn(Optional.of(child));
     }
 
     @Test
-    void anotherChildsCardIsNotFoundAndIsNotModified() {
-        User user = em.persist(User.create("ownership@example.com", "encoded", "encoded"));
-        Child child = em.persist(Child.create(user, "지우", AgeGroup.AGE_5));
-        Child other = em.persist(Child.create(user, "서아", AgeGroup.AGE_5));
-        LearnedWord card = em.persist(LearnedWord.create(other, word("통장"), false));
-        em.flush();
-        em.clear();
+    void viewingUsesChildScopedLookupAndPreservesOtherCardAndSticker() {
+        Word word = mock(Word.class);
+        LearnedWord card = LearnedWord.create(child, word, true);
+        LearnedWord untouched = LearnedWord.create(child, word, false);
+        when(repository.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.of(card));
+        when(repository.findAllWithWordByChildId(2L)).thenReturn(List.of(card, untouched));
 
-        assertThat(repository.findByIdAndChild_Id(card.getId(), child.getId())).isEmpty();
-        assertThatThrownBy(() -> service.markAsViewed(user.getId(), child.getId(), card.getId()))
+        service.markAsViewed(7L, 2L, 35L);
+        service.markAsViewed(7L, 2L, 35L);
+        var response = service.getWordbook(7L, 2L);
+
+        verify(repository, times(2)).findByIdAndChild_Id(35L, 2L);
+        assertThat(response.learnedWords()).extracting(LearnedWordResponse::isNew).containsExactly(false, true);
+        assertThat(card.isStickerEarned()).isTrue();
+        assertThat(untouched.isStickerEarned()).isFalse();
+    }
+
+    @Test
+    void emptyChildScopedLookupReturnsCardNotFound() {
+        when(repository.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markAsViewed(7L, 2L, 35L))
                 .isInstanceOfSatisfying(CustomException.class,
                         error -> assertThat(error.getErrorCode().getCode()).isEqualTo("LEARNED_WORD404"));
-        assertThat(repository.findById(card.getId()).orElseThrow().isNew()).isTrue();
-    }
-    @Autowired private TestEntityManager em;
-    @Autowired private LearnedWordRepository repository;
 
-    private Word word(String name) {
-        return em.persist(Word.createExternal(name, "설명", null, null, null,
-                null, null, "노래 설명", null, null, null, null, null));
+        verify(repository).findByIdAndChild_Id(35L, 2L);
+        verifyNoMoreInteractions(repository);
     }
 
     @Test
-    void filtersByChildOrdersByAcquisitionTimeAndIdAndFetchesWord() {
-        User user = em.persist(User.create("repo@example.com", "encoded", "encoded"));
-        Child child = em.persist(Child.create(user, "지우", AgeGroup.AGE_5));
-        Child other = em.persist(Child.create(user, "서아", AgeGroup.AGE_5));
-        LearnedWord oldest = em.persist(LearnedWord.create(child, word("적금"), false));
-        LearnedWord latest = em.persist(LearnedWord.create(child, word("자동차"), true));
-        LearnedWord tied = em.persist(LearnedWord.create(child, word("통장"), false));
-        em.persist(LearnedWord.create(other, word("영수증"), false));
-        em.flush();
-        LocalDateTime now = LocalDateTime.of(2026, 11, 4, 12, 0);
-        em.getEntityManager().createNativeQuery("update learned_words set learned_at = :time where learned_word_id = :id")
-                .setParameter("time", now.minusDays(1)).setParameter("id", oldest.getId()).executeUpdate();
-        em.getEntityManager().createNativeQuery("update learned_words set learned_at = :time where learned_word_id in (:first, :second)")
-                .setParameter("time", now).setParameter("first", latest.getId()).setParameter("second", tied.getId()).executeUpdate();
-        em.clear();
+    void mapsCardsInRepositoryOrderWithoutChangingNewFlags() {
+        LearnedWord first = mock(LearnedWord.class);
+        LearnedWord second = mock(LearnedWord.class);
+        Word firstWord = mock(Word.class);
+        Word secondWord = mock(Word.class);
+        when(first.getId()).thenReturn(35L);
+        when(second.getId()).thenReturn(34L);
+        when(first.getWord()).thenReturn(firstWord);
+        when(second.getWord()).thenReturn(secondWord);
+        when(firstWord.getWord()).thenReturn("적금");
+        when(secondWord.getWord()).thenReturn("자동차");
+        when(repository.findAllWithWordByChildId(2L)).thenReturn(List.of(first, second));
 
-        var result = repository.findAllWithWordByChildId(child.getId());
+        var response = service.getWordbook(7L, 2L);
 
-        assertThat(result).extracting(LearnedWord::getId)
-                .containsExactly(tied.getId(), latest.getId(), oldest.getId());
-        assertThat(result).allSatisfy(card -> assertThat(Hibernate.isInitialized(card.getWord())).isTrue());
-        assertThat(result).extracting(card -> card.getWord().getWord()).containsExactly("통장", "자동차", "적금");
+        assertThat(response.totalCount()).isEqualTo(2);
+        assertThat(response.learnedWords()).extracting(LearnedWordResponse::learnedWordId)
+                .containsExactly(35L, 34L);
+        assertThat(response.learnedWords()).extracting(LearnedWordResponse::word).containsExactly("적금", "자동차");
+        verify(repository).findAllWithWordByChildId(2L);
+        verify(first, never()).markAsViewed();
+        verify(second, never()).markAsViewed();
     }
 
     @Test
-    void returnsEmptyListForChildWithoutCards() {
-        assertThat(repository.findAllWithWordByChildId(Long.MAX_VALUE)).isEmpty();
+    void returnsEmptyWordbookWhenRepositoryReturnsNoCards() {
+        when(repository.findAllWithWordByChildId(2L)).thenReturn(List.of());
+
+        var response = service.getWordbook(7L, 2L);
+
+        assertThat(response.totalCount()).isZero();
+        assertThat(response.learnedWords()).isEmpty();
+        verify(repository).findAllWithWordByChildId(2L);
     }
 }
