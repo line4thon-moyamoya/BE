@@ -11,13 +11,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "consent_records")
+@Table(
+        name = "consent_records",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_consent_records_user_consent",
+                columnNames = {"user_id", "consent_id"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConsentRecord extends BaseTimeEntity {
 
@@ -45,5 +52,9 @@ public class ConsentRecord extends BaseTimeEntity {
 
     public static ConsentRecord create(User user, Consent consent, boolean agreed) {
         return new ConsentRecord(user, consent, agreed);
+    }
+
+    public void updateAgreement(boolean agreed) {
+        this.agreed = agreed;
     }
 }
