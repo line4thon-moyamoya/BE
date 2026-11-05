@@ -16,6 +16,7 @@ import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.moyamoya.domain.child.entity.AgeGroup;
 
 import java.util.List;
 import java.util.Optional;
@@ -158,9 +159,16 @@ class QuestionServiceTest {
     private void stubChildOwnership(Long userId, Long childId) {
         Child child = mock(Child.class);
         User user = mock(User.class);
+
         when(user.getId()).thenReturn(userId);
         when(child.getUser()).thenReturn(user);
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(childRepository.findById(childId)).thenReturn(Optional.of(child));
+
+        when(child.getAgeGroup()).thenReturn(AgeGroup.AGE_3_4);
+
+        when(userRepository.findById(userId))
+                .thenReturn(Optional.of(user));
+
+        when(childRepository.findById(childId))
+                .thenReturn(Optional.of(child));
     }
 }
