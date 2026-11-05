@@ -31,6 +31,7 @@ class QuestionServiceTest {
     private QuestionTargetExtractor targetExtractor;
     private JosaCandidateGenerator josaGenerator;
     private CandidateRankingService rankingService;
+    private SttService sttService;
     private QuestionSessionStore sessionStore;
     private WordRepository wordRepository;
     private ChildRepository childRepository;
@@ -42,6 +43,7 @@ class QuestionServiceTest {
         targetExtractor = mock(QuestionTargetExtractor.class);
         josaGenerator = mock(JosaCandidateGenerator.class);
         rankingService = mock(CandidateRankingService.class);
+        sttService = mock(SttService.class);
         sessionStore = mock(QuestionSessionStore.class);
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
@@ -51,6 +53,7 @@ class QuestionServiceTest {
                 targetExtractor,
                 josaGenerator,
                 rankingService,
+                sttService,
                 sessionStore,
                 wordRepository,
                 childRepository,

@@ -9,6 +9,10 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 server:
   port: ${SERVER_PORT:8080}
@@ -22,4 +26,9 @@ cors:
 
 jwt:
   secret: ${JWT_SECRET}
+
+clova:
+  speech:
+    invoke-url: ${CLOVA_SPEECH_INVOKE_URL}
+    secret-key: ${CLOVA_SPEECH_SECRET_KEY}
 

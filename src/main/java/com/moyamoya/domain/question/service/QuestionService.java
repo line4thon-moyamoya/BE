@@ -23,6 +23,7 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.security.exception.SecurityErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -36,27 +37,31 @@ public class QuestionService {
     private final QuestionTargetExtractor targetExtractor;
     private final JosaCandidateGenerator josaGenerator;
     private final CandidateRankingService rankingService;
+    private final SttService sttService;
     private final QuestionSessionStore sessionStore;
     private final WordRepository wordRepository;
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
 
-    public QuestionCandidateResponse analyze(
-            Long userId,
-            Long childId,
-            String recognizedSentence
-    ) {
-        if (userId == null) {
-            throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
-        }
-        verifyChildOwnership(userId, childId);
-        return runFirstCandidateFlow(childId, recognizedSentence);
-    }
-
     public QuestionCandidateResponse testStt(
             Long childId,
             String recognizedSentence
     ) {
+        return runFirstCandidateFlow(childId, recognizedSentence);
+    }
+
+    public QuestionCandidateResponse analyzeAudio(
+            Long userId,
+            Long childId,
+            MultipartFile audio
+    ) {
+        if (userId == null) {
+            throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+        }
+
+        verifyChildOwnership(userId, childId);
+
+        String recognizedSentence = sttService.transcribe(audio);
         return runFirstCandidateFlow(childId, recognizedSentence);
     }
 
@@ -79,30 +84,36 @@ public class QuestionService {
 
         verifyChildOwnership(userId, session.getChildId());
 
-        if (session.getStatus() != QuestionSessionStatus.FIRST_CANDIDATES_READY
-                && session.getStatus() != QuestionSessionStatus.FIRST_NO_CANDIDATES) {
-            throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+        synchronized (session) {
+            if (session.getStatus() != QuestionSessionStatus.FIRST_CANDIDATES_READY
+                    && session.getStatus() != QuestionSessionStatus.FIRST_NO_CANDIDATES) {
+                throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+            }
+
+            Set<String> excludedKeys = session.getFirstCandidates()
+                    .stream()
+                    .map(WordCandidate::candidateId)
+                    .collect(Collectors.toSet());
+
+            List<WordCandidate> candidates = rankingService.rankSecond(
+                    session.getTargetExpressions(),
+                    session.getOriginalSentence(),
+                    context,
+                    excludedKeys
+            );
+
+            List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(
+                    candidates,
+                    session.getChildId()
+            );
+
+            try {
+                session.setSecondCandidates(context, enrichedCandidates);
+            } catch (IllegalStateException exception) {
+                throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+            }
+            sessionStore.save(session);
         }
-
-        Set<String> excludedKeys = session.getFirstCandidates()
-                .stream()
-                .map(WordCandidate::candidateId)
-                .collect(Collectors.toSet());
-
-        List<WordCandidate> candidates = rankingService.rankSecond(
-                session.getTargetExpressions(),
-                session.getOriginalSentence(),
-                context,
-                excludedKeys
-        );
-
-        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(
-                candidates,
-                session.getChildId()
-        );
-
-        session.setSecondCandidates(context, enrichedCandidates);
-        sessionStore.save(session);
 
         return SecondCandidateResponse.of(
                 session.getSessionId().toString(),

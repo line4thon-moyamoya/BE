@@ -49,6 +49,24 @@ public enum QuestionErrorCode implements BaseErrorCode {
             "QUESTION400_INVALID_CANDIDATE",
             "선택할 수 없는 단어 후보입니다.",
             HttpStatus.BAD_REQUEST
+    ),
+
+    INVALID_AUDIO_FILE(
+            "QUESTION400_INVALID_AUDIO",
+            "올바른 음성 파일을 업로드해 주세요.",
+            HttpStatus.BAD_REQUEST
+    ),
+
+    STT_NO_SPEECH(
+            "QUESTION422_NO_SPEECH",
+            "음성을 인식하지 못했어요. 다시 말해 주세요.",
+            HttpStatus.UNPROCESSABLE_ENTITY
+    ),
+
+    STT_RECOGNITION_FAILED(
+            "QUESTION502_STT_FAILED",
+            "음성 인식 서비스에 문제가 발생했습니다.",
+            HttpStatus.BAD_GATEWAY
     );
 
     private final String code;
