@@ -37,3 +37,8 @@ google:
     language-code: ko-KR
     voice-name: ko-KR-Chirp3-HD-Leda
 
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET:moyamoya-audio-dev-moya}
+    region: ${AWS_REGION:ap-northeast-2}
+

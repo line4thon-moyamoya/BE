@@ -109,7 +109,10 @@ public class QuestionService {
                     candidates,
                     session.getChildId()
             );
-            List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(enrichedCandidates);
+            List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(
+                    enrichedCandidates,
+                    session.getChildId()
+            );
 
             try {
                 session.setSecondCandidates(context, candidatesWithTts);
@@ -162,7 +165,10 @@ public class QuestionService {
 
         List<WordCandidate> candidates = rankingService.rankFirst(expressions);
         List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
-        List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(enrichedCandidates);
+        List<WordCandidate> candidatesWithTts = enrichCandidatesWithTts(
+                enrichedCandidates,
+                childId
+        );
         session.setFirstCandidates(candidatesWithTts);
 
         sessionStore.save(session);
@@ -259,19 +265,66 @@ public class QuestionService {
     }
 
     private List<WordCandidate> enrichCandidatesWithTts(
-            List<WordCandidate> candidates
+            List<WordCandidate> candidates,
+            Long childId
     ) {
+        AgeGroup ageGroup = resolveChildAgeGroup(childId);
+
         return candidates.stream()
                 .map(candidate -> {
-                    String wordAudioBase64 = candidateTtsService.generateBase64IfNeeded(
-                            candidate.word(),
-                            candidate.wordAudioUrl()
-                    );
+                    Word existingWord = wordRepository
+                            .findByWord(candidate.word())
+                            .orElse(null);
 
-                    String descriptionAudioBase64 = candidateTtsService.generateBase64IfNeeded(
-                            candidate.definition(),
-                            candidate.descriptionAudioUrl()
-                    );
+                    if (existingWord != null) {
+                        candidateTtsService.ensureStoredAudio(
+                                existingWord,
+                                ageGroup
+                        );
+
+                        String descriptionKey =
+                                ageGroup == AgeGroup.AGE_3_4
+                                        ? existingWord.getDescriptionAudioAge3To4Url()
+                                        : existingWord.getDescriptionAudioAge5Url();
+
+                        String wordAudioUrl =
+                                candidateTtsService.resolveAudioUrl(
+                                        existingWord.getWordAudioUrl()
+                                );
+
+                        String descriptionAudioUrl =
+                                candidateTtsService.resolveAudioUrl(
+                                        descriptionKey
+                                );
+
+                        return new WordCandidate(
+                                candidate.candidateId(),
+                                existingWord.getId(),
+                                candidate.word(),
+                                existingWord.getSourceType(),
+                                candidate.pronunciationScore(),
+                                candidate.contextScore(),
+                                candidate.finalScore(),
+                                candidate.definition(),
+                                candidate.imageUrl(),
+                                wordAudioUrl,
+                                descriptionAudioUrl,
+                                null,
+                                null
+                        );
+                    }
+
+                    String wordAudioBase64 =
+                            candidateTtsService.generateBase64IfNeeded(
+                                    candidate.word(),
+                                    null
+                            );
+
+                    String descriptionAudioBase64 =
+                            candidateTtsService.generateBase64IfNeeded(
+                                    candidate.definition(),
+                                    null
+                            );
 
                     return new WordCandidate(
                             candidate.candidateId(),
@@ -283,8 +336,8 @@ public class QuestionService {
                             candidate.finalScore(),
                             candidate.definition(),
                             candidate.imageUrl(),
-                            candidate.wordAudioUrl(),
-                            candidate.descriptionAudioUrl(),
+                            null,
+                            null,
                             wordAudioBase64,
                             descriptionAudioBase64
                     );

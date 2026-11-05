@@ -141,4 +141,19 @@ public class Word extends BaseTimeEntity {
 
         return newWord;
     }
+
+    // 단어 발음 음성의 S3 객체 키 저장
+    public void updateWordAudioUrl(String s3Key) {
+        this.wordAudioUrl = s3Key;
+    }
+
+    // 3~4세 설명 음성의 S3 객체 키 저장
+    public void updateDescriptionAudioAge3To4Url(String s3Key) {
+        this.descriptionAudioAge3To4Url = s3Key;
+    }
+
+    // 5세 이상 설명 음성의 S3 객체 키 저장
+    public void updateDescriptionAudioAge5Url(String s3Key) {
+        this.descriptionAudioAge5Url = s3Key;
+    }
 }
