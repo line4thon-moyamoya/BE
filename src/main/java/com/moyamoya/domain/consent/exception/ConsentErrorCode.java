@@ -14,9 +14,19 @@ public enum ConsentErrorCode implements BaseErrorCode {
             "필수 약관에 모두 동의해 주세요.",
             HttpStatus.BAD_REQUEST
     ),
+    INVALID_CONSENT_REQUEST(
+            "CONSENT400_INVALID_REQUEST",
+            "동의 여부를 입력해 주세요.",
+            HttpStatus.BAD_REQUEST
+    ),
     CONSENT_NOT_FOUND(
             "CONSENT404",
             "등록되지 않은 동의 항목입니다.",
+            HttpStatus.NOT_FOUND
+    ),
+    CONSENT_RECORD_NOT_FOUND(
+            "CONSENT_RECORD404",
+            "사용자의 동의 내역을 찾을 수 없습니다.",
             HttpStatus.NOT_FOUND
     );
 
