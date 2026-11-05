@@ -41,6 +41,9 @@ public class QuestionTargetExtractor {
         String sentence = normalize(originalSentence);
         sentence = removeVocative(sentence);
 
+        // 질문 표현 정규화
+        sentence = normalizeQuestionExpression(sentence);
+
         if (sentence.isBlank()) {
             return QuestionExtractionResult.failure(
                     originalSentence, "TARGET_NOT_FOUND"
@@ -77,6 +80,15 @@ public class QuestionTargetExtractor {
         }
 
         return successOrFailure(originalSentence, target);
+    }
+
+    // 질문 표현만 정규화 (목표 단어의 발음은 변경하지 않음)
+    private String normalizeQuestionExpression(String sentence) {
+        return sentence
+                .replaceAll("(?<=\\s)머야$", "뭐야")
+                .replaceAll("(?<=\\s)모야$", "뭐야")
+                .replaceAll("(?<=\\s)뭘까$", "뭐야")
+                .replaceAll("(?<=\\s)뭔데$", "뭐야");
     }
 
     private QuestionExtractionResult successOrFailure(
@@ -136,9 +148,10 @@ public class QuestionTargetExtractor {
         // 단순 인용문이 아니라 의미를 묻는 문장인지 확인
         String afterQuote = sentence.substring(matcher.end());
 
-        if (afterQuote.contains("뭐야")
-                || afterQuote.contains("뜻")
-                || afterQuote.contains("뭔데")) {
+        // 인용된 단어의 의미를 묻는 질문인지 확인
+        if (afterQuote.matches(
+                ".*(?:뭐야|머야|모야|뭘까|뭘까요|뭔데|뭐지|뭐예요|뭐에요|뜻|의미|알려줘|설명해줘).*"
+        )) {
             return matcher.group(1).trim();
         }
 
