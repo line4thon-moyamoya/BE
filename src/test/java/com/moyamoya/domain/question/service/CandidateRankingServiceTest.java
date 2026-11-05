@@ -3,10 +3,12 @@ package com.moyamoya.domain.question.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
 import com.moyamoya.domain.question.model.WordCandidate;
+import com.moyamoya.domain.word.entity.HeardFrom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +26,8 @@ class CandidateRankingServiceTest {
         rankingService = new CandidateRankingService(
                 loader,
                 new PronunciationSimilarity(),
-                new PronunciationVariantGenerator(loader)
+                new PronunciationVariantGenerator(loader),
+                new ContextScoringService()
         );
     }
 
@@ -83,5 +86,18 @@ class CandidateRankingServiceTest {
                 )
         ).contains("세금");
     }
-}
 
+    @Test
+    void secondRankingShouldExcludeFirstCandidateKeys() {
+        List<WordCandidate> candidates = rankingService.rankSecond(
+                List.of("데금"),
+                "엄마가 세금 내야 된다고 했어. 데금이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of("CURATED:세금", "CURATED:소금", "CURATED:선거")
+        );
+
+        assertThat(candidates)
+                .extracting(WordCandidate::candidateId)
+                .doesNotContain("CURATED:세금", "CURATED:소금", "CURATED:선거");
+    }
+}

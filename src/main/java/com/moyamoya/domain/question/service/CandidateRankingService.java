@@ -7,6 +7,7 @@ import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.moyamoya.domain.word.entity.HeardFrom;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,11 +19,23 @@ public class CandidateRankingService {
     private final QuestionDataLoader dataLoader;
     private final PronunciationSimilarity similarity;
     private final PronunciationVariantGenerator variantGenerator;
+    private final ContextScoringService contextScoringService;
 
     // 초기 실험값 (테스트 후 조정)
     private static final double MIN_SCORE = 0.60;
     private static final double MAX_GAP = 0.22;
     private static final int MAX_CANDIDATES = 3;
+
+    // F2-2 초기 실험값
+    private static final double SECOND_PRON_WEIGHT = 0.60;
+    private static final double SECOND_CONTEXT_WEIGHT = 0.25;
+    private static final double SECOND_SOURCE_WEIGHT = 0.15;
+
+    // 발음이 지나치게 다른 단어 제외
+    private static final double SECOND_MIN_PRON_SCORE = 0.45;
+
+    // 최종 점수 하한
+    private static final double SECOND_MIN_SCORE = 0.50;
 
     // 조사 제거형이 일반 유사도에서 과도하게 우대되지 않도록 감점
     private static final double STRIPPED_PENALTY = 0.02;
@@ -55,6 +68,15 @@ public class CandidateRankingService {
     private record ScoredWord(
             QuestionWordData data,
             MatchResult match
+    ) {}
+
+    // F2-2 후보별 점수
+    private record SecondScoredWord(
+            QuestionWordData data,
+            double pronunciationScore,
+            double contextScore,
+            double sourceScore,
+            double finalScore
     ) {}
 
     /**
@@ -140,6 +162,126 @@ public class CandidateRankingService {
                 })
                 .limit(MAX_CANDIDATES)
                 .map(this::toCandidate)
+                .toList();
+    }
+
+    /**
+     * F2-2: 1차 후보를 모두 거절했을 때 재정렬
+     *
+     * @param targetExpressions F1에서 추출한 표현
+     * @param originalText 기존 STT 원문
+     * @param heardFrom 아이가 선택한 출처
+     * @param excludedKeys F2-1에서 실제 표시한 후보 key
+     */
+    public List<WordCandidate> rankSecond(
+            List<String> targetExpressions,
+            String originalText,
+            HeardFrom heardFrom,
+            Set<String> excludedKeys
+    ) {
+        List<String> expressions = normalizeExpressions(targetExpressions);
+
+        if (expressions.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> excluded = excludedKeys == null
+                ? Set.of()
+                : excludedKeys;
+
+        boolean hasContext = originalText != null
+                && !originalText.isBlank();
+
+        boolean hasSource = heardFrom != null
+                && heardFrom != HeardFrom.UNKNOWN;
+
+        double pronWeight = SECOND_PRON_WEIGHT;
+        double contextWeight = hasContext
+                ? SECOND_CONTEXT_WEIGHT : 0.0;
+        double sourceWeight = hasSource
+                ? SECOND_SOURCE_WEIGHT : 0.0;
+
+        double totalWeight =
+                pronWeight + contextWeight + sourceWeight;
+
+        List<SecondScoredWord> scored = new ArrayList<>();
+
+        for (QuestionWordData data : dataLoader.getWords()) {
+
+            if (data.word() == null || data.word().isBlank()) {
+                continue;
+            }
+
+            String candidateKey = "CURATED:" + data.word();
+
+            if (excluded.contains(candidateKey)) {
+                continue;
+            }
+
+            MatchResult match = calculateBestMatch(expressions, data);
+            double pronunciationScore = match.score();
+
+            if (pronunciationScore < SECOND_MIN_PRON_SCORE) {
+                continue;
+            }
+
+            double contextScore = hasContext
+                    ? contextScoringService.calculateContextScore(
+                    originalText, data
+            )
+                    : 0.0;
+
+            double sourceScore = hasSource
+                    ? contextScoringService.calculateSourceScore(
+                    heardFrom, data
+            )
+                    : 0.0;
+
+            double finalScore = clamp(
+                    (
+                            pronunciationScore * pronWeight
+                                    + contextScore * contextWeight
+                                    + sourceScore * sourceWeight
+                    ) / totalWeight
+            );
+
+            if (finalScore < SECOND_MIN_SCORE) {
+                continue;
+            }
+
+            scored.add(new SecondScoredWord(
+                    data,
+                    pronunciationScore,
+                    contextScore,
+                    sourceScore,
+                    finalScore
+            ));
+        }
+
+        Comparator<SecondScoredWord> comparator =
+                Comparator.comparingDouble(
+                                SecondScoredWord::finalScore
+                        ).reversed()
+                        .thenComparing(
+                                Comparator.comparingDouble(
+                                        SecondScoredWord::pronunciationScore
+                                ).reversed()
+                        )
+                        .thenComparing(item -> item.data().word());
+
+        Map<String, SecondScoredWord> unique = new LinkedHashMap<>();
+
+        scored.stream()
+                .sorted(comparator)
+                .forEach(item ->
+                        unique.putIfAbsent(
+                                item.data().word(), item
+                        )
+                );
+
+        return unique.values().stream()
+                .limit(MAX_CANDIDATES)
+                .map(this::toSecondCandidate)
                 .toList();
     }
 
@@ -391,8 +533,36 @@ public class CandidateRankingService {
         );
     }
 
+    // F2-2 결과 -> 기존 WordCandidate 형식
+    private WordCandidate toSecondCandidate(
+            SecondScoredWord scored
+    ) {
+        QuestionWordData data = scored.data();
+
+        double contextWeight = SECOND_CONTEXT_WEIGHT;
+        double sourceWeight = SECOND_SOURCE_WEIGHT;
+
+        double combinedContextScore = clamp(
+                (
+                        scored.contextScore() * contextWeight
+                                + scored.sourceScore() * sourceWeight
+                ) / (contextWeight + sourceWeight)
+        );
+
+        return new WordCandidate(
+                "CURATED:" + data.word(),
+                null,
+                data.word(),
+                WordSourceType.CURATED,
+                scored.pronunciationScore(),
+                combinedContextScore,
+                scored.finalScore(),
+                data.definition(),
+                null
+        );
+    }
+
     private double clamp(double score) {
         return Math.max(0.0, Math.min(1.0, score));
     }
 }
-

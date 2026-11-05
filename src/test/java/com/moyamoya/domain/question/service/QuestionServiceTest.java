@@ -4,7 +4,13 @@ import com.moyamoya.domain.question.extractor.JosaCandidateGenerator;
 import com.moyamoya.domain.question.extractor.QuestionTargetExtractor;
 import com.moyamoya.domain.question.model.QuestionExtractionResult;
 import com.moyamoya.domain.question.model.WordCandidate;
+import com.moyamoya.domain.question.session.QuestionSession;
 import com.moyamoya.domain.question.session.QuestionSessionStore;
+import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.user.entity.User;
+import com.moyamoya.domain.user.repository.UserRepository;
+import com.moyamoya.domain.word.entity.HeardFrom;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
@@ -13,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +33,8 @@ class QuestionServiceTest {
     private CandidateRankingService rankingService;
     private QuestionSessionStore sessionStore;
     private WordRepository wordRepository;
+    private ChildRepository childRepository;
+    private UserRepository userRepository;
     private QuestionService questionService;
 
     @BeforeEach
@@ -35,13 +44,17 @@ class QuestionServiceTest {
         rankingService = mock(CandidateRankingService.class);
         sessionStore = mock(QuestionSessionStore.class);
         wordRepository = mock(WordRepository.class);
+        childRepository = mock(ChildRepository.class);
+        userRepository = mock(UserRepository.class);
 
         questionService = new QuestionService(
                 targetExtractor,
                 josaGenerator,
                 rankingService,
                 sessionStore,
-                wordRepository
+                wordRepository,
+                childRepository,
+                userRepository
         );
     }
 
@@ -65,6 +78,7 @@ class QuestionServiceTest {
                 )));
         when(rankingService.resolveTargetPronunciation(any()))
                 .thenReturn(Optional.empty());
+        stubChildOwnership(1L, 1L);
 
         Word word = mock(Word.class);
         when(word.getId()).thenReturn(42L);
@@ -75,8 +89,66 @@ class QuestionServiceTest {
         var response = questionService.testStt(1L, "엄마, 데금이 뭐야?");
 
         assertThat(response.candidates()).hasSize(1);
-        assertThat(response.candidates().get(0).wordId()).isEqualTo(42L);
-        assertThat(response.candidates().get(0).description()).isEqualTo("나라에 내는 돈");
-        assertThat(response.candidates().get(0).wordAudioUrl()).isEqualTo("https://cdn/audio/word-tax.mp3");
+        assertThat(response.candidates().getFirst().wordId()).isEqualTo(42L);
+        assertThat(response.candidates().getFirst().description()).isEqualTo("나라에 내는 돈");
+        assertThat(response.candidates().getFirst().wordAudioUrl()).isEqualTo("https://cdn/audio/word-tax.mp3");
+    }
+
+    @Test
+    void findSecondCandidatesUsesSessionDataAndExcludesFirstCandidates() {
+        QuestionSession session = QuestionSession.create(1L, "엄마 저끔이 뭐야?", null);
+        session.setExtractionResult("저끔", List.of("저끔"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "CURATED:적금",
+                null,
+                "적금",
+                WordSourceType.CURATED,
+                0.9,
+                0.0,
+                0.9,
+                "정의",
+                null
+        )));
+
+        List<WordCandidate> secondCandidates = List.of(new WordCandidate(
+                "CURATED:연금",
+                null,
+                "연금",
+                WordSourceType.CURATED,
+                0.8,
+                0.6,
+                0.75,
+                "정의2",
+                null
+        ));
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        stubChildOwnership(1L, 1L);
+        when(rankingService.rankSecond(
+                List.of("저끔"),
+                "엄마 저끔이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of("CURATED:적금")
+        )).thenReturn(secondCandidates);
+        when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+
+        var response = questionService.findSecondCandidates(
+                1L,
+                session.getSessionId().toString(),
+                HeardFrom.PARENTS
+        );
+
+        assertThat(response.status()).isEqualTo("CANDIDATES_FOUND");
+        assertThat(response.candidates()).hasSize(1);
+        assertThat(response.candidates().getFirst().candidateId()).isEqualTo("CURATED:연금");
+    }
+
+    private void stubChildOwnership(Long userId, Long childId) {
+        Child child = mock(Child.class);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(userId);
+        when(child.getUser()).thenReturn(user);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(childRepository.findById(childId)).thenReturn(Optional.of(child));
     }
 }

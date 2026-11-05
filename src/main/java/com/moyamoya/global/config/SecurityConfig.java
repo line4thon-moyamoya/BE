@@ -51,6 +51,10 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/api/v1/questions/test/stt"
                         ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/questions/test/candidates/second"
+                        ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
