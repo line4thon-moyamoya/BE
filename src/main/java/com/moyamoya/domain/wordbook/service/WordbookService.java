@@ -3,6 +3,7 @@ package com.moyamoya.domain.wordbook.service;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
+import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.wordbook.dto.response.LearnedWordResponse;
 import com.moyamoya.domain.wordbook.dto.response.WordbookResponse;
 import com.moyamoya.domain.wordbook.exception.WordbookErrorCode;
@@ -20,13 +21,25 @@ public class WordbookService {
 
     @Transactional(readOnly = true)
     public WordbookResponse getWordbook(Long userId, Long childId) {
+        validateChildOwnership(userId, childId);
+        List<LearnedWordResponse> cards = learnedWordRepository.findAllWithWordByChildId(childId)
+                .stream().map(LearnedWordResponse::from).toList();
+        return new WordbookResponse(cards.size(), cards);
+    }
+
+    @Transactional
+    public void markAsViewed(Long userId, Long childId, Long learnedWordId) {
+        validateChildOwnership(userId, childId);
+        LearnedWord card = learnedWordRepository.findByIdAndChild_Id(learnedWordId, childId)
+                .orElseThrow(() -> new CustomException(WordbookErrorCode.LEARNED_WORD_NOT_FOUND));
+        card.markAsViewed();
+    }
+
+    private void validateChildOwnership(Long userId, Long childId) {
         Child child = childRepository.findById(childId)
                 .orElseThrow(() -> new CustomException(WordbookErrorCode.CHILD_NOT_FOUND));
         if (!child.getUser().getId().equals(userId)) {
             throw new CustomException(WordbookErrorCode.CHILD_ACCESS_DENIED);
         }
-        List<LearnedWordResponse> cards = learnedWordRepository.findAllWithWordByChildId(childId)
-                .stream().map(LearnedWordResponse::from).toList();
-        return new WordbookResponse(cards.size(), cards);
     }
 }

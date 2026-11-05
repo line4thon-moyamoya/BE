@@ -3,6 +3,7 @@ package com.moyamoya.domain.wordbook.controller;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,54 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 @SpringJUnitWebConfig(WordbookControllerTest.Config.class)
 class WordbookControllerTest {
+    @Test
+    void marksViewedWithoutRequestBodyAndReturnsNullData() throws Exception {
+        mvc.perform(patch("/api/v1/children/2/learned-words/35/viewed")
+                        .header("Authorization", accessToken()))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"success": true, "code": 200, "message": "단어 카드 열람이 처리되었습니다.", "data": null}
+                        """, org.springframework.test.json.JsonCompareMode.STRICT));
+        verify(service).markAsViewed(7L, 2L, 35L);
+    }
+
+    @Test
+    void viewingWithoutAccessTokenReturns401() throws Exception {
+        mvc.perform(patch("/api/v1/children/2/learned-words/35/viewed"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTH401"));
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid", "refresh", "parent"})
+    void viewingWithInvalidAccessTokenReturns401(String type) throws Exception {
+        String token = switch (type) {
+            case "refresh" -> tokens.issueTokens(7L).refreshToken();
+            case "parent" -> tokens.issueParentModeToken(7L);
+            default -> "invalid";
+        };
+        mvc.perform(patch("/api/v1/children/2/learned-words/35/viewed").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTH401"));
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"CHILD_ACCESS_DENIED", "CHILD_NOT_FOUND", "LEARNED_WORD_NOT_FOUND"})
+    void viewingReturnsDomainError(String name) throws Exception {
+        WordbookErrorCode error = WordbookErrorCode.valueOf(name);
+        doThrow(new CustomException(error)).when(service).markAsViewed(7L, 2L, 35L);
+        mvc.perform(patch("/api/v1/children/2/learned-words/35/viewed").header("Authorization", accessToken()))
+                .andExpect(status().is(error.getHttpStatus().value()))
+                .andExpect(jsonPath("$.code").value(error.getCode()))
+                .andExpect(jsonPath("$.message").value(error.getMessage()));
+    }
+
+    @Test
+    void viewingUnexpectedFailureReturnsCommon500() throws Exception {
+        doThrow(new IllegalStateException("test failure")).when(service).markAsViewed(7L, 2L, 35L);
+        mvc.perform(patch("/api/v1/children/2/learned-words/35/viewed").header("Authorization", accessToken()))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("COMMON500"));
+    }
     @Configuration
     @EnableWebMvc
     @Import({WordbookController.class, SecurityConfig.class, JwtAuthenticationFilter.class,

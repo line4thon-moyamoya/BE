@@ -16,6 +16,7 @@ import java.security.Principal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +26,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/children/{childId}/learned-words")
 @Tag(name = "Wordbook", description = "단어 수첩 API")
 public class WordbookController {
+    private static final String VIEWED_SUCCESS_EXAMPLE = """
+            {"success": true, "code": 200, "message": "단어 카드 열람이 처리되었습니다.", "data": null}
+            """;
+    private static final String CARD_NOT_FOUND_EXAMPLE = """
+            {"success": false, "code": "LEARNED_WORD404", "message": "단어 카드를 찾을 수 없습니다.", "data": null}
+            """;
     private static final String SUCCESS_EXAMPLE = """
             {
               "success": true,
@@ -56,6 +63,42 @@ public class WordbookController {
             """;
 
     private final WordbookService wordbookService;
+
+    @Operation(summary = "단어 카드 열람 처리",
+            description = "로그인한 보호자 소유 아이의 카드 NEW 배지를 해제합니다. "
+                    + "이미 열람한 카드도 200을 반환하며 요청 본문은 필요하지 않습니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "열람 처리 성공. 이미 열람한 카드도 정상 처리",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = VIEWED_SUCCESS_EXAMPLE))),
+            @ApiResponse(responseCode = "401", description = "로그인 필요",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = UNAUTHORIZED_EXAMPLE))),
+            @ApiResponse(responseCode = "403", description = "다른 보호자의 아이에 대한 접근",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = FORBIDDEN_EXAMPLE))),
+            @ApiResponse(responseCode = "404", description = "아이 또는 해당 아이의 카드 없음",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = BaseResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "아이 없음", value = NOT_FOUND_EXAMPLE),
+                                    @ExampleObject(name = "카드 없음 또는 다른 아이의 카드", value = CARD_NOT_FOUND_EXAMPLE)
+                            })),
+            @ApiResponse(responseCode = "500", description = "서버 오류",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = SERVER_ERROR_EXAMPLE)))
+    })
+    @PatchMapping("/{learnedWordId}/viewed")
+    public ResponseEntity<BaseResponse<Void>> markAsViewed(
+            Principal principal,
+            @Parameter(description = "아이 ID", example = "1", required = true)
+            @PathVariable("childId") Long childId,
+            @Parameter(description = "열람한 단어 카드 ID", example = "1", required = true)
+            @PathVariable("learnedWordId") Long learnedWordId
+    ) {
+        wordbookService.markAsViewed(Long.valueOf(principal.getName()), childId, learnedWordId);
+        return ResponseEntity.ok(BaseResponse.success("단어 카드 열람이 처리되었습니다.", null));
+    }
 
     @Operation(summary = "단어 수첩 조회",
             description = "로그인한 보호자의 아이가 획득한 카드를 최신 획득순으로 조회합니다. "

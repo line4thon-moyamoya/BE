@@ -16,6 +16,53 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class WordbookServiceTest {
+    @Test
+    void marksNewCardViewedAndPreservesSticker() {
+        Child child = ownedChild();
+        LearnedWord card = LearnedWord.create(child, mock(Word.class), true);
+        when(cards.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.of(card));
+        service.markAsViewed(7L, 2L, 35L);
+        assertThat(card.isNew()).isFalse();
+        assertThat(card.isStickerEarned()).isTrue();
+    }
+
+    @Test
+    void repeatedViewingSucceeds() {
+        Child child = ownedChild();
+        LearnedWord card = LearnedWord.create(child, mock(Word.class), false);
+        when(cards.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.of(card));
+        service.markAsViewed(7L, 2L, 35L);
+        service.markAsViewed(7L, 2L, 35L);
+        assertThat(card.isNew()).isFalse();
+        assertThat(card.isStickerEarned()).isFalse();
+    }
+
+    @Test
+    void viewingMissingCardReturnsCard404() {
+        ownedChild();
+        when(cards.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.markAsViewed(7L, 2L, 35L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        error -> assertThat(error.getErrorCode().getCode()).isEqualTo("LEARNED_WORD404"));
+    }
+
+    @Test
+    void viewingMissingChildDoesNotQueryCard() {
+        when(children.findById(2L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.markAsViewed(7L, 2L, 35L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        error -> assertThat(error.getErrorCode().getCode()).isEqualTo("CHILD404"));
+        verifyNoInteractions(cards);
+    }
+
+    @Test
+    void viewingOtherParentsChildDoesNotQueryCard() {
+        ownedChild();
+        assertThatThrownBy(() -> service.markAsViewed(8L, 2L, 35L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        error -> assertThat(error.getErrorCode().getCode()).isEqualTo("CHILD403"));
+        verifyNoInteractions(cards);
+    }
     private final ChildRepository children = mock(ChildRepository.class);
     private final LearnedWordRepository cards = mock(LearnedWordRepository.class);
     private final WordbookService service = new WordbookService(children, cards);
