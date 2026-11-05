@@ -22,7 +22,11 @@ public class QuestionSession {
     // F1이 추출한 원본 표현 (조사 제거 전)
     private String recognizedText;
 
-    // 조사 판단으로 생성한 비교용 표현들
+    // F2에서 조사 여부를 판단한 발음
+    // 확실하지 않으면 recognizedText를 그대로 유지 => 후에 리포트랑 물어볼 단어에 저장
+    private String targetPronunciation;
+
+    // 조사 제거 등을 적용한 검색용 표현들
     private List<String> targetExpressions = List.of();
 
     // 1차 및 2차 후보
@@ -73,8 +77,54 @@ public class QuestionSession {
             throw new IllegalArgumentException("추출된 표현이 없습니다.");
         }
 
-        this.recognizedText = recognizedText;
+        if (targetExpressions == null || targetExpressions.isEmpty()) {
+            throw new IllegalArgumentException("검색용 표현이 없습니다.");
+        }
+
+        this.recognizedText = recognizedText.trim();
+
+        // F2 판단 전에는 원본 표현 유지
+        this.targetPronunciation = this.recognizedText;
+
         this.targetExpressions = List.copyOf(targetExpressions);
+        touch();
+    }
+
+    // F2에서 조사 여부를 판단한 후 저장할 발음을 갱신
+    public synchronized void updateTargetPronunciation(
+            String pronunciation
+    ) {
+        // 질문 처리 중 또는 후보 탐색이 끝난 상태에서만 수정 가능
+        requireStatusIn(
+                QuestionSessionStatus.PROCESSING,
+                QuestionSessionStatus.FIRST_CANDIDATES_READY,
+                QuestionSessionStatus.FIRST_NO_CANDIDATES,
+                QuestionSessionStatus.SECOND_CANDIDATES_READY,
+                QuestionSessionStatus.SECOND_NO_CANDIDATES
+        );
+
+        if (recognizedText == null) {
+            throw new IllegalStateException(
+                    "F1 추출 결과가 먼저 저장되어야 합니다."
+            );
+        }
+
+        if (pronunciation == null || pronunciation.isBlank()) {
+            throw new IllegalArgumentException(
+                    "저장할 발음이 없습니다."
+            );
+        }
+
+        String normalized = pronunciation.trim();
+
+        // F2에서 생성한 표현 중 하나만 선택 가능
+        if (!targetExpressions.contains(normalized)) {
+            throw new IllegalArgumentException(
+                    "검색용 표현 목록에 없는 발음입니다."
+            );
+        }
+
+        this.targetPronunciation = normalized;
         touch();
     }
 

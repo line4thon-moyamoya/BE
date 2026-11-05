@@ -175,6 +175,76 @@ class QuestionSessionTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    // F1 추출 직후에는 원본 발음을 유지
+    @Test
+    void extractionResultInitiallyPreservesOriginalPronunciation() {
+        QuestionSession session = createSession();
+
+        session.setExtractionResult(
+                "구케이원이",
+                List.of("구케이원이", "구케이원")
+        );
+
+        assertThat(session.getRecognizedText())
+                .isEqualTo("구케이원이");
+
+        assertThat(session.getTargetPronunciation())
+                .isEqualTo("구케이원이");
+    }
+
+    // F2 판단 후 조사 제거형으로 변경 가능
+    @Test
+    void targetPronunciationCanBeUpdatedAfterJosaResolution() {
+        QuestionSession session = createSession();
+
+        session.setExtractionResult(
+                "구케이원이",
+                List.of("구케이원이", "구케이원")
+        );
+
+        session.updateTargetPronunciation("구케이원");
+
+        assertThat(session.getRecognizedText())
+                .isEqualTo("구케이원이");
+
+        assertThat(session.getTargetPronunciation())
+                .isEqualTo("구케이원");
+    }
+
+    // 검색용 표현에 없는 값은 저장 불가
+    @Test
+    void targetPronunciationMustBeOneOfTargetExpressions() {
+        QuestionSession session = createSession();
+
+        session.setExtractionResult(
+                "구케이원이",
+                List.of("구케이원이", "구케이원")
+        );
+
+        assertThatThrownBy(() ->
+                session.updateTargetPronunciation("국회의원")
+        ).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // 질문이 종료된 뒤에는 발음 변경 불가
+    @Test
+    void targetPronunciationCannotChangeAfterUnresolved() {
+        QuestionSession session = createSession();
+
+        session.setExtractionResult(
+                "구케이원이",
+                List.of("구케이원이", "구케이원")
+        );
+
+        session.setFirstCandidates(List.of());
+        session.setSecondCandidates(HeardFrom.UNKNOWN, List.of());
+        session.markUnresolved();
+
+        assertThatThrownBy(() ->
+                session.updateTargetPronunciation("구케이원")
+        ).isInstanceOf(IllegalStateException.class);
+    }
+
     private QuestionSession createSession() {
         return QuestionSession.create(
                 1L,
