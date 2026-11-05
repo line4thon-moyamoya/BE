@@ -47,6 +47,9 @@ class JwtTokenProviderTest {
         assertThat(parentModeClaims.getSubject()).isEqualTo("1");
         assertThat(parentModeClaims.get("tokenType")).isEqualTo("PARENT_MODE");
         assertThat(parentModeClaims.getExpiration()).isEqualTo(java.util.Date.from(now.plusSeconds(180)));
+        assertThat(provider.getUserIdFromParentModeToken(parentModeToken)).isEqualTo(1L);
+        assertThatThrownBy(() -> provider.getUserIdFromParentModeToken(tokens.accessToken()))
+                .isInstanceOf(io.jsonwebtoken.JwtException.class);
     }
 
     @Test
