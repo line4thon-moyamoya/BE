@@ -58,6 +58,10 @@ public class JwtTokenProvider {
         return getUserIdFromToken(token, REFRESH_TOKEN_TYPE);
     }
 
+    public Long getUserIdFromParentModeToken(String token) {
+        return getUserIdFromToken(token, PARENT_MODE_TOKEN_TYPE);
+    }
+
     private String createToken(Long userId, String tokenType, long expirationMs) {
         Instant issuedAt = clock.instant();
         Instant expiresAt = issuedAt.plusMillis(expirationMs);

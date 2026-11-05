@@ -4,7 +4,10 @@ import com.moyamoya.domain.consent.dto.request.ConsentStatusUpdateRequest;
 import com.moyamoya.domain.consent.dto.response.ConsentStatusResponse;
 import com.moyamoya.domain.consent.service.ConsentService;
 import com.moyamoya.global.common.BaseResponse;
+import com.moyamoya.security.parentmode.ParentModeRequired;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -84,7 +87,13 @@ public class UserConsentController {
     @Operation(
             summary = "음성 수집 동의 상태 변경",
             description = "현재 로그인 사용자의 음성 수집 동의를 철회하거나 다시 동의합니다. "
-                    + "철회할 때는 false, 재동의할 때는 true를 전달합니다.",
+                    + "철회할 때는 false, 재동의할 때는 true를 전달하며 보호자 모드 인증이 필요합니다.",
+            parameters = @Parameter(
+                    name = "X-Parent-Mode-Token",
+                    description = "보호자 PIN 인증 후 발급받은 Parent Mode Token",
+                    required = true,
+                    in = ParameterIn.HEADER
+            ),
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
@@ -143,6 +152,7 @@ public class UserConsentController {
                     )
             )
     })
+    @ParentModeRequired
     @PatchMapping("/VOICE_PROCESSING")
     public ResponseEntity<BaseResponse<ConsentStatusResponse>> updateVoiceProcessingConsent(
             Principal principal,
