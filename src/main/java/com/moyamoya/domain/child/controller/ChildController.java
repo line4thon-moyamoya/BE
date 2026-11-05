@@ -6,7 +6,9 @@ import com.moyamoya.domain.child.dto.request.UpdateChildRequest;
 import com.moyamoya.domain.child.dto.response.ChildResponse;
 import com.moyamoya.domain.child.service.ChildService;
 import com.moyamoya.global.common.BaseResponse;
+import com.moyamoya.security.parentmode.ParentModeRequired;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Parameter;
 import java.security.Principal;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -124,7 +127,13 @@ public class ChildController {
 
     @Operation(summary = "아이 프로필 수정",
             description = "로그인한 보호자 소유의 아이 프로필을 수정합니다. 생략한 필드는 유지합니다. "
-                    + "null은 허용하지 않으며 최소 한 필드를 전달해야 합니다. 보호자 모드 토큰 검증은 추후 적용 예정입니다.",
+                    + "null은 허용하지 않으며 최소 한 필드를 전달해야 합니다. 보호자 모드 인증이 필요합니다.",
+            parameters = @Parameter(
+                    name = "X-Parent-Mode-Token",
+                    description = "보호자 PIN 인증 후 발급받은 Parent Mode Token",
+                    required = true,
+                    in = ParameterIn.HEADER
+            ),
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "아이 프로필 수정 성공",
@@ -158,6 +167,7 @@ public class ChildController {
                             schema = @Schema(implementation = BaseResponse.class),
                             examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)))
     })
+    @ParentModeRequired
     @PatchMapping("/{childId}")
     public ResponseEntity<BaseResponse<Map<String, Object>>> updateChild(
             Principal principal,
@@ -173,7 +183,6 @@ public class ChildController {
                             }))
             @RequestBody UpdateChildRequest request
     ) {
-        // TODO: 보호자 모드 검증 구현 후 X-Parent-Mode-Token을 검증한다.
         childService.updateChild(Long.valueOf(principal.getName()), childId, request);
         return ResponseEntity.ok(BaseResponse.success("아이 프로필이 수정되었습니다.", Map.of()));
     }
@@ -181,7 +190,13 @@ public class ChildController {
     @Operation(summary = "아이 프로필 추가",
             description = "로그인한 보호자에게 아이를 추가합니다. 별명과 나이 구간은 필수이며, "
                     + "모야 유형을 생략하거나 null로 보내면 DEFAULT가 적용됩니다. "
-                    + "보호자 모드 토큰 검증은 추후 적용 예정입니다.",
+                    + "보호자 모드 인증이 필요합니다.",
+            parameters = @Parameter(
+                    name = "X-Parent-Mode-Token",
+                    description = "보호자 PIN 인증 후 발급받은 Parent Mode Token",
+                    required = true,
+                    in = ParameterIn.HEADER
+            ),
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "아이 프로필 추가 성공",
@@ -206,6 +221,7 @@ public class ChildController {
                             schema = @Schema(implementation = BaseResponse.class),
                             examples = @ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)))
     })
+    @ParentModeRequired
     @PostMapping
     public ResponseEntity<BaseResponse<ChildResponse>> createChild(
             Principal principal,
@@ -219,7 +235,6 @@ public class ChildController {
                             }))
             @RequestBody CreateChildRequest request
     ) {
-        // TODO: 보호자 모드 검증 구현 후 X-Parent-Mode-Token을 검증한다.
         ChildResponse response = childService.createChild(Long.valueOf(principal.getName()), request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(BaseResponse.created("아이 프로필이 추가되었습니다.", response));
