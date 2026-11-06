@@ -76,6 +76,16 @@ public class QuestionSessionStore {
                 && !session.isExpired();
     }
 
+    // 세션은 유지하고 임시 WAV만 삭제
+    public void deleteTempAudio(QuestionSession session) {
+        synchronized (session) {
+            audioTempService.delete(
+                    session.getOriginalAudioTempPath()
+            );
+            session.clearOriginalAudio();
+        }
+    }
+
     // 다른 세션 객체로 교체된 경우 잘못 삭제하지 않도록 확인
     private void removeIfSame(
             UUID sessionId,

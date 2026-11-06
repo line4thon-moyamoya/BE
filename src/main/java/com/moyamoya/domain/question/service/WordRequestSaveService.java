@@ -151,14 +151,32 @@ public class WordRequestSaveService {
                 throw new CustomException(QuestionErrorCode.WORD_REQUEST_SAVE_FAILED);
             }
 
+            // DB 커밋 성공 후 세션을 미해결 상태로 변경
             try {
                 session.markUnresolved();
-            } catch (IllegalStateException exception) {
-                throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
+            } catch (IllegalStateException e) {
+                log.error(
+                        "DB 저장 후 세션 상태 변경 실패. sessionId={}",
+                        session.getSessionId(),
+                        e
+                );
+                throw new CustomException(
+                        QuestionErrorCode.INVALID_SESSION_STATE
+                );
             }
+
             sessionStore.save(session);
 
-            audioTempService.delete(tempPath);
+            // 임시 WAV 삭제 및 세션의 파일 경로 초기화
+            try {
+                sessionStore.deleteTempAudio(session);
+            } catch (RuntimeException e) {
+                log.warn(
+                        "물어볼 단어 저장 후 임시 음성 삭제 실패. sessionId={}",
+                        session.getSessionId(),
+                        e
+                );
+            }
 
             return response;
         }

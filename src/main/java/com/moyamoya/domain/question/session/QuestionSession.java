@@ -276,6 +276,13 @@ public class QuestionSession {
         touch();
     }
 
+    // 원본 음성 파일 연결 해제
+    public synchronized void clearOriginalAudio() {
+        this.originalAudioTempPath = null;
+        this.originalAudioContentType = null;
+        touch();
+    }
+
     private void requireCandidateReady() {
         if (status != QuestionSessionStatus.FIRST_CANDIDATES_READY
                 && status != QuestionSessionStatus.SECOND_CANDIDATES_READY) {
