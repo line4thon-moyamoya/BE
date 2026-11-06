@@ -105,4 +105,55 @@ public class Word extends BaseTimeEntity {
 
         return newWord;
     }
+
+    // CSV 기본 단어 시딩용
+    public static Word createCurated(
+            String word,
+            String definition,
+            String category,
+            String descAge3To4,
+            String descAge5,
+            String example,
+            String hint,
+            String songDescription,
+            HeardFrom heardFrom
+    ) {
+        Word newWord = new Word();
+
+        newWord.word = word;
+        newWord.definition = definition;
+        newWord.category = category;
+        newWord.descAge3To4 = descAge3To4;
+        newWord.descAge5 = descAge5;
+        newWord.example = example;
+        newWord.hint = hint;
+        newWord.songDescription = songDescription;
+        newWord.heardFrom = heardFrom;
+
+        // 기본 단어
+        newWord.sourceType = WordSourceType.CURATED;
+
+        // 음성 및 이미지는 추후 생성
+        newWord.imageUrl = null;
+        newWord.wordAudioUrl = null;
+        newWord.descriptionAudioAge3To4Url = null;
+        newWord.descriptionAudioAge5Url = null;
+
+        return newWord;
+    }
+
+    // 단어 발음 음성의 S3 객체 키 저장
+    public void updateWordAudioUrl(String s3Key) {
+        this.wordAudioUrl = s3Key;
+    }
+
+    // 3~4세 설명 음성의 S3 객체 키 저장
+    public void updateDescriptionAudioAge3To4Url(String s3Key) {
+        this.descriptionAudioAge3To4Url = s3Key;
+    }
+
+    // 5세 이상 설명 음성의 S3 객체 키 저장
+    public void updateDescriptionAudioAge5Url(String s3Key) {
+        this.descriptionAudioAge5Url = s3Key;
+    }
 }
