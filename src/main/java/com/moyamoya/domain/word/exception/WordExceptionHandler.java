@@ -2,6 +2,7 @@ package com.moyamoya.domain.word.exception;
 
 import com.moyamoya.domain.word.controller.WordController;
 import com.moyamoya.domain.word.controller.WordCardController;
+import com.moyamoya.domain.word.controller.RepetitionController;
 import com.moyamoya.global.common.BaseResponse;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -10,10 +11,19 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = {WordController.class, WordCardController.class})
+@RestControllerAdvice(assignableTypes = {WordController.class, WordCardController.class, RepetitionController.class})
 public class WordExceptionHandler {
+    @ExceptionHandler({MissingServletRequestPartException.class, MaxUploadSizeExceededException.class})
+    public ResponseEntity<BaseResponse<Void>> handleInvalidAudio(Exception exception) {
+        RepetitionErrorCode error = RepetitionErrorCode.INVALID_AUDIO;
+        return ResponseEntity.status(error.getHttpStatus())
+                .body(BaseResponse.error(error.getCode(), error.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<BaseResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return error(switch (exception.getName()) {
