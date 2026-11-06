@@ -11,6 +11,7 @@ import jakarta.persistence.EntityManager;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
+import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.global.exception.CustomException;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,8 @@ class WordServiceTest {
     private final ChildRepository children = mock(ChildRepository.class);
     private final WordRepository words = mock(WordRepository.class);
     private final CandidateTtsService tts = mock(CandidateTtsService.class);
-    private final WordService service = new WordService(children, words,
+    private final WordService service = new WordService(new WordLookupService(children, words,
+            mock(LearnedWordRepository.class)),
             new WordDescriptionAudioService(tts, mock(EntityManager.class)));
 
     private void child(AgeGroup age) {

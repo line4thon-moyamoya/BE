@@ -12,6 +12,7 @@ import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
+import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,8 @@ class WordCardServiceTest {
     private final ChildRepository children = mock(ChildRepository.class);
     private final LearnedWordRepository cards = mock(LearnedWordRepository.class);
     private final CandidateTtsService tts = mock(CandidateTtsService.class);
-    private final WordCardService service = new WordCardService(children, cards,
+    private final WordCardService service = new WordCardService(new WordLookupService(children,
+            mock(WordRepository.class), cards),
             new WordDescriptionAudioService(tts, mock(EntityManager.class)));
 
     private Child child(AgeGroup age) {

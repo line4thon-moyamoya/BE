@@ -21,7 +21,7 @@ public class WordDescriptionAudioService {
     private final EntityManager entityManager;
 
     /**
-     * 조회 트랜잭션과 분리하여 누락된 음성을 준비한다.
+     * 조회 트랜잭션이 끝난 뒤 누락된 음성을 준비한다.
      * 음성 생성 시에는 단어를 잠금 조회하고 재확인하여 이 경로의 중복 생성을 방지한다.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
