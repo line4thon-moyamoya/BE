@@ -1,0 +1,55 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: moyamoya-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: moyamoya
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql-init.sql:/docker-entrypoint-initdb.d/01-consents.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - backend
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moyamoya-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://db:3306/moyamoya?serverTimezone=UTC&characterEncoding=UTF-8&useUnicode=true
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-3600000}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-1209600000}
+      PARENT_MODE_TOKEN_TTL: ${PARENT_MODE_TOKEN_TTL:-600000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      TZ: Asia/Seoul
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - backend
+
+volumes:
+  mysql_data:
+
+networks:
+  backend:
+    driver: bridge

@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+.idea
+.vscode
+build
+out
+.env
+.env.*
+*.iml
+*.log
+Dockerfile*
+docker-compose*.yml
+DEPLOY.md
