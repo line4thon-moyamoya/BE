@@ -26,7 +26,7 @@ logging:
 jwt:
   access-token-expiration-ms: ${ACCESS_TOKEN_TTL}
   refresh-token-expiration-ms: ${REFRESH_TOKEN_TTL}
-  parent-mode-token-expiration-ms: ${PARENT_MODE_TOKEN_TTL:600000}
+  parent-mode-token-expiration-ms: ${PARENT_MODE_TOKEN_TTL}
 
 parent-pin:
   max-failed-attempts: ${PARENT_PIN_MAX_FAILED_ATTEMPTS:5}
@@ -35,4 +35,7 @@ parent-pin:
 
 aws:
   s3:
-    prefix: ${S3_PREFIX:prod}
+    prefix: ${AWS_S3_PREFIX:prod}
+
+tts:
+  processor-url: ${TTS_PROCESSOR_URL}
