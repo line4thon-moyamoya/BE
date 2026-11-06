@@ -8,6 +8,10 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum WordErrorCode implements BaseErrorCode {
+    INVALID_WORD_ID("WORD400", "올바른 단어 ID를 입력해 주세요.", HttpStatus.BAD_REQUEST),
+    INVALID_CHILD_ID("CHILD400", "올바른 아이 ID를 입력해 주세요.", HttpStatus.BAD_REQUEST),
+    CHILD_ACCESS_DENIED("CHILD403", "접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
+    CHILD_NOT_FOUND("CHILD404", "해당 아이를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
 
     WORD400(
             "WORD400",
