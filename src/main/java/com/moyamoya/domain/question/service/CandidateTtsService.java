@@ -45,8 +45,8 @@ public class CandidateTtsService {
 
             String key = "words/audio/" + word.getId() + "/word.wav";
 
-            s3AudioService.uploadWav(key, wav);
-            word.updateWordAudioUrl(key);
+            String uploadKey = s3AudioService.uploadWav(key, wav);
+            word.updateWordAudioUrl(uploadKey);
         }
 
         // 2. 현재 아이 연령대에 해당하는 설명 음성만 생성
@@ -74,12 +74,12 @@ public class CandidateTtsService {
                     ? "words/audio/" + word.getId() + "/desc-age-3-4.wav"
                     : "words/audio/" + word.getId() + "/desc-age-5.wav";
 
-            s3AudioService.uploadWav(key, wav);
+            String uploadKey = s3AudioService.uploadWav(key, wav);
 
             if (age3To4) {
-                word.updateDescriptionAudioAge3To4Url(key);
+                word.updateDescriptionAudioAge3To4Url(uploadKey);
             } else {
-                word.updateDescriptionAudioAge5Url(key);
+                word.updateDescriptionAudioAge5Url(uploadKey);
             }
         }
 

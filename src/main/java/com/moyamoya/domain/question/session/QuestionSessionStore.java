@@ -1,6 +1,7 @@
 package com.moyamoya.domain.question.session;
 
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +37,7 @@ public class QuestionSessionStore {
         sessions.remove(sessionId);
     }
 
-    // 추후 @Scheduled로 주기적 정리
+    @Scheduled(fixedDelayString = "${question.session.cleanup-delay-ms:300000}")
     public void removeExpiredSessions() {
         sessions.entrySet().removeIf(
                 entry -> entry.getValue().isExpired()

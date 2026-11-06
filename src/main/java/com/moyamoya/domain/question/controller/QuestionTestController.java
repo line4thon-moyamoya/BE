@@ -20,7 +20,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Profile({"local", "dev"})
+@Profile("dev")
 @RequestMapping("/api/v1/questions/test")
 public class QuestionTestController {
 

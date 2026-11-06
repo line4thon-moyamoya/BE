@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -39,10 +40,14 @@ public class S3AudioService {
                 .contentType("audio/wav")
                 .build();
 
-        s3Client.putObject(
-                request,
-                RequestBody.fromBytes(wav)
-        );
+        try {
+            s3Client.putObject(
+                    request,
+                    RequestBody.fromBytes(wav)
+            );
+        } catch (SdkException exception) {
+            throw new IllegalStateException("S3 음성 업로드에 실패했습니다.", exception);
+        }
 
         return uploadKey;
     }
@@ -59,9 +64,13 @@ public class S3AudioService {
                         .getObjectRequest(getRequest)
                         .build();
 
-        return s3Presigner.presignGetObject(presignRequest)
-                .url()
-                .toString();
+        try {
+            return s3Presigner.presignGetObject(presignRequest)
+                    .url()
+                    .toString();
+        } catch (SdkException exception) {
+            throw new IllegalStateException("S3 음성 URL 생성에 실패했습니다.", exception);
+        }
     }
 
     private String withPrefix(String key) {

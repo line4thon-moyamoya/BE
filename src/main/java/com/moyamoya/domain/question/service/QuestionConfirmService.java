@@ -104,23 +104,29 @@ public class QuestionConfirmService {
 
             questionHistoryRepository.save(history);
 
-            // 세션 확정
-            session.confirm();
-            sessionStore.save(session);
-
             boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
 
             String descriptionKey = age3To4
                     ? word.getDescriptionAudioAge3To4Url()
                     : word.getDescriptionAudioAge5Url();
 
-            String wordAudioUrl = candidateTtsService.resolveAudioUrl(
-                    word.getWordAudioUrl()
-            );
+            String wordAudioUrl;
+            String descriptionAudioUrl;
+            try {
+                wordAudioUrl = candidateTtsService.resolveAudioUrl(
+                        word.getWordAudioUrl()
+                );
 
-            String descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
-                    descriptionKey
-            );
+                descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
+                        descriptionKey
+                );
+            } catch (RuntimeException exception) {
+                throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+            }
+
+            // 세션 확정
+            session.confirm();
+            sessionStore.save(session);
 
             return new ConfirmWordResponse(
                     "CONFIRMED",

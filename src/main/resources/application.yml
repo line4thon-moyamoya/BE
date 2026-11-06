@@ -31,6 +31,8 @@ clova:
   speech:
     invoke-url: ${CLOVA_SPEECH_INVOKE_URL}
     secret-key: ${CLOVA_SPEECH_SECRET_KEY}
+    connect-timeout-ms: ${CLOVA_SPEECH_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${CLOVA_SPEECH_READ_TIMEOUT_MS:10000}
 
 google:
   tts:
@@ -42,3 +44,10 @@ aws:
     bucket: ${AWS_S3_BUCKET:moyamoya-audio-dev-moya}
     region: ${AWS_REGION:ap-northeast-2}
 
+question:
+  session:
+    cleanup-delay-ms: ${QUESTION_SESSION_CLEANUP_DELAY_MS:300000}
+
+tts:
+  processor-connect-timeout-ms: ${TTS_PROCESSOR_CONNECT_TIMEOUT_MS:2000}
+  processor-read-timeout-ms: ${TTS_PROCESSOR_READ_TIMEOUT_MS:5000}

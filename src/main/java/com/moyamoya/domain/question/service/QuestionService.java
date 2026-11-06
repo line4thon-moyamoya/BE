@@ -115,7 +115,7 @@ public class QuestionService {
                         enrichedCandidates,
                         session.getChildId()
                 );
-            } catch (IllegalArgumentException | IllegalStateException e) {
+            } catch (RuntimeException e) {
                 throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
             }
 
@@ -203,7 +203,7 @@ public class QuestionService {
         try {
             byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
             dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
-        } catch (IllegalArgumentException | IllegalStateException e) {
+        } catch (RuntimeException e) {
             throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
         }
 

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/test/tts")
-@Profile({"local", "dev"})
+@Profile("dev")
 public class TtsTestController {
     private final MoyaTtsService moyaTtsService;
 
@@ -30,4 +30,3 @@ public class TtsTestController {
                 .body(audio);
     }
 }
-

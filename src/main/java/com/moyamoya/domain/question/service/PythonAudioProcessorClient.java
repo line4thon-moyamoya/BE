@@ -3,6 +3,7 @@ package com.moyamoya.domain.question.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -15,10 +16,17 @@ public class PythonAudioProcessorClient {
     private final RestClient restClient;
 
     public PythonAudioProcessorClient(
-            @Value("${tts.processor-url}") String processorUrl
+            @Value("${tts.processor-url}") String processorUrl,
+            @Value("${tts.processor-connect-timeout-ms:2000}") int connectTimeoutMs,
+            @Value("${tts.processor-read-timeout-ms:5000}") int readTimeoutMs
     ) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
+
         this.restClient = RestClient.builder()
                 .baseUrl(processorUrl)
+                .requestFactory(requestFactory)
                 .build();
     }
 

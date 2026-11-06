@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.global.exception.CustomException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -16,19 +16,32 @@ import java.io.IOException;
 import java.util.Locale;
 
 @Service
-@RequiredArgsConstructor
 public class SttService {
 
     private final ObjectMapper objectMapper;
+    private final RestClient restClient;
+    private final String invokeUrl;
+    private final String secretKey;
 
-    private final RestClient restClient = RestClient.builder()
-            .build();
+    public SttService(
+            ObjectMapper objectMapper,
+            @Value("${clova.speech.invoke-url}") String invokeUrl,
+            @Value("${clova.speech.secret-key}") String secretKey,
+            @Value("${clova.speech.connect-timeout-ms:3000}") int connectTimeoutMs,
+            @Value("${clova.speech.read-timeout-ms:10000}") int readTimeoutMs
+    ) {
+        this.objectMapper = objectMapper;
+        this.invokeUrl = invokeUrl;
+        this.secretKey = secretKey;
 
-    @Value("${clova.speech.invoke-url}")
-    private String invokeUrl;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(connectTimeoutMs);
+        requestFactory.setReadTimeout(readTimeoutMs);
 
-    @Value("${clova.speech.secret-key}")
-    private String secretKey;
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
+    }
 
     public String transcribe(MultipartFile audio) {
         validateAudio(audio);
