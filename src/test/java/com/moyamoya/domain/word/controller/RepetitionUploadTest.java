@@ -51,15 +51,17 @@ class RepetitionUploadTest {
         reset(service);
     }
 
-    private ResponseEntity<String> upload(String path, int bytes) {
-        ByteArrayResource resource = new ByteArrayResource(new byte[bytes]) {
-            @Override
-            public String getFilename() {
-                return "voice.wav";
-            }
-        };
+    private ResponseEntity<String> upload(String path, int... fileSizes) {
         var body = new LinkedMultiValueMap<String, Object>();
-        body.add("audio", resource);
+        for (int bytes : fileSizes) {
+            ByteArrayResource resource = new ByteArrayResource(new byte[bytes]) {
+                @Override
+                public String getFilename() {
+                    return "voice.wav";
+                }
+            };
+            body.add("audio", resource);
+        }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         return rest.exchange(path, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
@@ -75,7 +77,7 @@ class RepetitionUploadTest {
 
     @Test
     void oversizedRequestAlsoReturnsRepetition400() {
-        var response = upload(REPETITION, 8192);
+        var response = upload(REPETITION, 1024, 1024, 1024, 1024, 1024);
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         assertThat(response.getBody()).contains("\"code\":\"REPETITION400\"");
         verifyNoInteractions(service);

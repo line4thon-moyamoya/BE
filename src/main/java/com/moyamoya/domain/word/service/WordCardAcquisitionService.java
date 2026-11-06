@@ -22,7 +22,7 @@ public class WordCardAcquisitionService {
     private final LearnedWordRepository learnedWordRepository;
 
     /**
-     * 서버 판정 결과를 카드에 반영한다. 외부 STT·TTS 호출 후 별도 Bean에서 호출한다.
+     * STT 판정 후 별도 트랜잭션에서 카드를 저장하고, 안내 TTS는 저장 후 호출한다.
      * 같은 아이의 획득 요청은 아이 행 잠금으로 직렬화하며, 재학습은 NEW를 변경하지 않는다.
      */
     @Transactional

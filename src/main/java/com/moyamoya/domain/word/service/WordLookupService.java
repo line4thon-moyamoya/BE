@@ -61,6 +61,5 @@ public class WordLookupService {
         return child;
     }
 
-    // 트랜잭션 종료 후 응답 구성에 필요한 값까지 조회 단계에서 확보
     public record LookupResult(Word word, AgeGroup ageGroup, Long learnedWordId, String imageUrl) {}
 }
