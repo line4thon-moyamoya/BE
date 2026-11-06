@@ -1,7 +1,9 @@
 package com.moyamoya.domain.question.session;
 
-import org.springframework.stereotype.Component;
+import com.moyamoya.domain.question.service.QuestionAudioTempService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.Optional;
@@ -9,7 +11,10 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
+@RequiredArgsConstructor
 public class QuestionSessionStore {
+
+    private final QuestionAudioTempService audioTempService;
 
     private final Map<UUID, QuestionSession> sessions =
             new ConcurrentHashMap<>();
@@ -25,22 +30,61 @@ public class QuestionSessionStore {
             return Optional.empty();
         }
 
-        if (session.isExpired()) {
-            sessions.remove(sessionId);
-            return Optional.empty();
-        }
+        synchronized (session) {
+            if (sessions.get(sessionId) != session) {
+                return Optional.empty();
+            }
 
-        return Optional.of(session);
+            if (session.isExpired()) {
+                // 만료된 세션과 임시 파일을 함께 정리
+                removeIfSame(sessionId, session);
+                return Optional.empty();
+            }
+
+            return Optional.of(session);
+        }
     }
 
     public void remove(UUID sessionId) {
-        sessions.remove(sessionId);
+        QuestionSession session = sessions.get(sessionId);
+
+        if (session == null) {
+            return;
+        }
+
+        synchronized (session) {
+            removeIfSame(sessionId, session);
+        }
     }
 
-    @Scheduled(fixedDelayString = "${question.session.cleanup-delay-ms:300000}")
+    @Scheduled(
+            fixedDelayString =
+                    "${question.session.cleanup-delay-ms:300000}"
+    )
     public void removeExpiredSessions() {
-        sessions.entrySet().removeIf(
-                entry -> entry.getValue().isExpired()
-        );
+        sessions.forEach((sessionId, session) -> {
+            synchronized (session) {
+                if (session.isExpired()) {
+                    removeIfSame(sessionId, session);
+                }
+            }
+        });
+    }
+
+    public boolean isCurrent(QuestionSession session) {
+        return sessions.get(session.getSessionId()) == session
+                && !session.isExpired();
+    }
+
+    // 다른 세션 객체로 교체된 경우 잘못 삭제하지 않도록 확인
+    private void removeIfSame(
+            UUID sessionId,
+            QuestionSession session
+    ) {
+        if (sessions.remove(sessionId, session)) {
+            audioTempService.delete(
+                    session.getOriginalAudioTempPath()
+            );
+        }
     }
 }

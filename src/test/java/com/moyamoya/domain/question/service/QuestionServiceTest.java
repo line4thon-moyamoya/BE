@@ -16,6 +16,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
+import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.moyamoya.domain.child.entity.AgeGroup;
@@ -42,6 +43,7 @@ class QuestionServiceTest {
     private WordRepository wordRepository;
     private ChildRepository childRepository;
     private UserRepository userRepository;
+    private QuestionAudioTempService audioTempService;
     private QuestionService questionService;
 
     @BeforeEach
@@ -56,6 +58,7 @@ class QuestionServiceTest {
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
         userRepository = mock(UserRepository.class);
+        audioTempService = mock(QuestionAudioTempService.class);
 
         questionService = new QuestionService(
                 targetExtractor,
@@ -67,7 +70,8 @@ class QuestionServiceTest {
                 sessionStore,
                 wordRepository,
                 childRepository,
-                userRepository
+                userRepository,
+                audioTempService
         );
 
         when(moyaTtsService.synthesize(any()))
@@ -266,6 +270,20 @@ class QuestionServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void analyzeAudioThrowsAudioTempSaveFailedWhenTempSaveFails() {
+        MultipartFile audio = mock(MultipartFile.class);
+        when(audio.isEmpty()).thenReturn(false);
+        when(audioTempService.save(audio))
+                .thenThrow(new IllegalStateException("temp save failed"));
+        stubChildOwnership(1L, 1L);
+
+        assertThatThrownBy(() -> questionService.analyzeAudio(1L, 1L, audio))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.AUDIO_TEMP_SAVE_FAILED);
     }
 
     private void stubChildOwnership(Long userId, Long childId) {

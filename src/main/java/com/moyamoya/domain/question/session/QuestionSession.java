@@ -6,6 +6,7 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.nio.file.Path;
 
 @Getter
 public class QuestionSession {
@@ -40,6 +41,12 @@ public class QuestionSession {
 
     // 2차에서 선택한 들은 곳
     private HeardFrom heardFrom;
+
+    // S3 업로드 전까지 보관할 원본 음성 임시 파일
+    private Path originalAudioTempPath;
+
+    // 원본 파일의 MIME 타입
+    private String originalAudioContentType;
 
     private QuestionSessionStatus status;
     private final LocalDateTime createdAt;
@@ -247,6 +254,26 @@ public class QuestionSession {
 
     public boolean isExpired() {
         return updatedAt.plusMinutes(30).isBefore(LocalDateTime.now());
+    }
+
+    // STT 분석에 사용한 원본 음성 연결
+    public synchronized void attachOriginalAudio(
+            Path tempPath,
+            String contentType
+    ) {
+        requireStatus(QuestionSessionStatus.PROCESSING);
+
+        if (originalAudioTempPath != null) {
+            throw new IllegalStateException(
+                    "원본 음성이 이미 연결되어 있습니다."
+            );
+        }
+
+        this.originalAudioTempPath =
+                Objects.requireNonNull(tempPath);
+
+        this.originalAudioContentType = contentType;
+        touch();
     }
 
     private void requireCandidateReady() {
