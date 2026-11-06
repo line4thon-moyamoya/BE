@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.word.dto.response.WordDescriptionResponse;
+import com.moyamoya.domain.word.dto.response.WordCardDetailResponse;
+import com.moyamoya.domain.word.service.WordCardService;
 import com.moyamoya.domain.word.exception.WordErrorCode;
 import com.moyamoya.domain.word.exception.WordExceptionHandler;
 import com.moyamoya.domain.word.service.WordService;
@@ -35,10 +37,11 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 class WordControllerTest {
     @Configuration
     @EnableWebMvc
-    @Import({WordController.class, WordExceptionHandler.class, GlobalExceptionHandler.class, SecurityConfig.class,
+    @Import({WordController.class, WordCardController.class, WordExceptionHandler.class, GlobalExceptionHandler.class, SecurityConfig.class,
             JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class})
     static class Config {
         @Bean WordService service() { return mock(WordService.class); }
+        @Bean WordCardService cardService() { return mock(WordCardService.class); }
         @Bean ObjectMapper mapper() { return new ObjectMapper(); }
         @Bean CorsConfigurationSource corsConfigurationSource() { return request -> null; }
         @Bean JwtTokenProvider tokens() {
@@ -47,16 +50,89 @@ class WordControllerTest {
     }
     @Autowired private WebApplicationContext context;
     @Autowired private WordService service;
+    @Autowired private WordCardService cardService;
     @Autowired private JwtTokenProvider tokens;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        reset(service);
+        reset(service, cardService);
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
 
     private String auth() { return "Bearer " + tokens.issueTokens(7L).accessToken(); }
+
+    @Test
+    void returnsCardDetailWithoutStickerOrNewFields() throws Exception {
+        when(cardService.getWordCardDetail(7L, 2L, 35L))
+                .thenReturn(new WordCardDetailResponse(35L, 1L, "적금", "아이 설명", "image.png", "desc.wav"));
+        mvc.perform(get("/api/v1/children/2/learned-words/35").header("Authorization", auth()))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"success":true,"code":200,"message":"단어 카드 상세 정보를 조회했습니다.",
+                         "data":{"learnedWordId":35,"wordId":1,"word":"적금","description":"아이 설명",
+                                 "imageUrl":"image.png","descriptionAudioUrl":"desc.wav"}}
+                        """, org.springframework.test.json.JsonCompareMode.STRICT));
+        verify(cardService).getWordCardDetail(7L, 2L, 35L);
+    }
+
+    @Test
+    void cardDetailReturnsNullFields() throws Exception {
+        when(cardService.getWordCardDetail(7L, 2L, 35L))
+                .thenReturn(new WordCardDetailResponse(35L, 1L, "적금", null, null, null));
+        mvc.perform(get("/api/v1/children/2/learned-words/35").header("Authorization", auth()))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"success":true,"code":200,"message":"단어 카드 상세 정보를 조회했습니다.",
+                         "data":{"learnedWordId":35,"wordId":1,"word":"적금","description":null,
+                                 "imageUrl":null,"descriptionAudioUrl":null}}
+                        """, org.springframework.test.json.JsonCompareMode.STRICT));
+    }
+
+    @Test
+    void cardDetailRequiresAccessToken() throws Exception {
+        mvc.perform(get("/api/v1/children/2/learned-words/35"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTH401"));
+        verifyNoInteractions(cardService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"invalid", "refresh", "parent"})
+    void cardDetailRejectsWrongTokens(String type) throws Exception {
+        String token = switch (type) {
+            case "refresh" -> tokens.issueTokens(7L).refreshToken();
+            case "parent" -> tokens.issueParentModeToken(7L);
+            default -> "invalid";
+        };
+        mvc.perform(get("/api/v1/children/2/learned-words/35").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(cardService);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"abc,35,CHILD400", "2,abc,LEARNED_WORD400", "2,999999999999999999999,LEARNED_WORD400"})
+    void cardDetailRejectsMalformedIds(String child, String card, String code) throws Exception {
+        mvc.perform(get("/api/v1/children/" + child + "/learned-words/" + card).header("Authorization", auth()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(code));
+        verifyNoInteractions(cardService);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = WordErrorCode.class, names = {"INVALID_CHILD_ID", "INVALID_LEARNED_WORD_ID",
+            "CHILD_ACCESS_DENIED", "CHILD_NOT_FOUND", "LEARNED_WORD_NOT_FOUND", "WORD404"})
+    void cardDetailReturnsDomainErrors(WordErrorCode error) throws Exception {
+        when(cardService.getWordCardDetail(7L, 2L, 35L)).thenThrow(new CustomException(error));
+        mvc.perform(get("/api/v1/children/2/learned-words/35").header("Authorization", auth()))
+                .andExpect(status().is(error.getHttpStatus().value()))
+                .andExpect(jsonPath("$.code").value(error.getCode()));
+    }
+
+    @Test
+    void cardDetailUnexpectedFailureReturns500() throws Exception {
+        when(cardService.getWordCardDetail(7L, 2L, 35L)).thenThrow(new IllegalStateException("test failure"));
+        mvc.perform(get("/api/v1/children/2/learned-words/35").header("Authorization", auth()))
+                .andExpect(status().isInternalServerError()).andExpect(jsonPath("$.code").value("COMMON500"));
+    }
 
     @Test
     void returnsDescriptionAndUsesAuthenticatedUserWithoutParentToken() throws Exception {
