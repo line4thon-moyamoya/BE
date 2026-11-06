@@ -28,7 +28,7 @@ public class WordCardController {
     private static final String SUCCESS_EXAMPLE = """
             {"success": true, "code": 200, "message": "단어 카드 상세 정보를 조회했습니다.",
              "data": {"learnedWordId": 35, "wordId": 1, "word": "적금", "description": "적금은 돈을 조금씩 모으는 거야.",
-                      "imageUrl": "https://example.com/images/1.png", "descriptionAudioUrl": null}}
+                      "imageUrl": "https://example.com/images/1.png", "descriptionAudioUrl": "https://example.com/audio/1-desc.wav"}}
             """;
     private static final String INVALID_CARD_EXAMPLE = """
             {"success": false, "code": "LEARNED_WORD400", "message": "올바른 단어 카드 ID를 입력해 주세요.", "data": null}
@@ -58,9 +58,9 @@ public class WordCardController {
     private final WordCardService wordCardService;
 
     @Operation(summary = "공통 단어 카드 상세 조회",
-            description = "획득한 카드의 연령별 설명, 이미지 및 저장된 설명 음성 값을 조회합니다. "
-                    + "스티커와 NEW는 반환하거나 변경하지 않습니다. 미등록 값은 null입니다. "
-                    + "S3 객체 키를 재생 가능한 Presigned URL로 변환하는 기능은 PR #18 반영 후 연동 예정입니다.",
+            description = "획득한 카드의 연령별 설명과 이미지를 조회하며, 연령별 설명이 없으면 기본 정의를 사용합니다. "
+                    + "음성은 재사용하고 누락된 경우에만 TTS 생성·S3 저장합니다. 첫 생성에는 시간과 비용이 발생합니다. "
+                    + "WAV 재생 URL은 발급 후 30분 유효합니다. 스티커와 NEW는 반환하거나 변경하지 않습니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "카드 상세 조회 성공",

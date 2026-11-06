@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WordService {
     private final ChildRepository childRepository;
     private final WordRepository wordRepository;
+    private final WordDescriptionAudioService wordDescriptionAudioService;
 
     @Transactional(readOnly = true)
     public WordDescriptionResponse getWordDescription(Long userId, Long wordId, Long childId) {
@@ -32,11 +33,6 @@ public class WordService {
         }
         Word word = wordRepository.findById(wordId)
                 .orElseThrow(() -> new CustomException(WordErrorCode.WORD404));
-        return switch (child.getAgeGroup()) {
-            case AGE_3_4 -> new WordDescriptionResponse(word.getId(), word.getWord(),
-                    word.getDescAge3To4(), word.getDescriptionAudioAge3To4Url());
-            case AGE_5 -> new WordDescriptionResponse(word.getId(), word.getWord(),
-                    word.getDescAge5(), word.getDescriptionAudioAge5Url());
-        };
+        return wordDescriptionAudioService.resolve(word, child.getAgeGroup());
     }
 }

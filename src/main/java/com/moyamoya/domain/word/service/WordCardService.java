@@ -3,6 +3,7 @@ package com.moyamoya.domain.word.service;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.word.dto.response.WordCardDetailResponse;
+import com.moyamoya.domain.word.dto.response.WordDescriptionResponse;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.exception.WordErrorCode;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WordCardService {
     private final ChildRepository childRepository;
     private final LearnedWordRepository learnedWordRepository;
+    private final WordDescriptionAudioService wordDescriptionAudioService;
 
     @Transactional(readOnly = true)
     public WordCardDetailResponse getWordCardDetail(Long userId, Long childId, Long learnedWordId) {
@@ -37,11 +39,8 @@ public class WordCardService {
         if (word == null) {
             throw new CustomException(WordErrorCode.WORD404);
         }
-        return switch (child.getAgeGroup()) {
-            case AGE_3_4 -> new WordCardDetailResponse(card.getId(), word.getId(), word.getWord(),
-                    word.getDescAge3To4(), word.getImageUrl(), word.getDescriptionAudioAge3To4Url());
-            case AGE_5 -> new WordCardDetailResponse(card.getId(), word.getId(), word.getWord(),
-                    word.getDescAge5(), word.getImageUrl(), word.getDescriptionAudioAge5Url());
-        };
+        WordDescriptionResponse description = wordDescriptionAudioService.resolve(word, child.getAgeGroup());
+        return new WordCardDetailResponse(card.getId(), description.wordId(), description.word(),
+                description.description(), word.getImageUrl(), description.descriptionAudioUrl());
     }
 }
