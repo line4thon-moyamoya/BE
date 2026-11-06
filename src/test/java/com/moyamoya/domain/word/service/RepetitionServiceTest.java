@@ -10,6 +10,7 @@ import com.moyamoya.domain.question.config.QuestionDataLoader;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.service.PronunciationSimilarity;
 import com.moyamoya.domain.question.service.SttService;
+import com.moyamoya.domain.question.service.MoyaTtsService;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
@@ -34,6 +35,7 @@ class RepetitionServiceTest {
     @Mock private WordRepository words;
     @Mock private LearnedWordRepository cards;
     @Mock private SttService stt;
+    @Mock private MoyaTtsService tts;
     @Mock private QuestionDataLoader loader;
     private RepetitionService service;
     private Child child;
@@ -44,7 +46,7 @@ class RepetitionServiceTest {
     void setUp() {
         service = new RepetitionService(children, words, stt,
                 new RepetitionEvaluationService(new PronunciationSimilarity(), loader, words),
-                new WordCardAcquisitionService(children, words, cards));
+                new WordCardAcquisitionService(children, words, cards), new RepetitionDialogueService(tts));
     }
 
     private void ownedWord() {
@@ -85,6 +87,9 @@ class RepetitionServiceTest {
         assertThat(result.learnedWordId()).isEqualTo(35L);
         assertThat(result.isCorrect()).isEqualTo(correct);
         assertThat(result.isNewAcquisition()).isTrue();
+        assertThat(result.repetitionDialogue().text()).isEqualTo(correct
+                ? "우와! 적금! 잘했어!" : "적금! 적금! 다음에 또 해보자!");
+        assertThat(result.acquisitionDialogue().text()).isEqualTo("새로운 단어 카드를 받았어! 수첩에서 확인해 봐!");
         var order = inOrder(stt, children, cards);
         order.verify(stt).transcribe(audio);
         order.verify(children).findByIdForUpdate(2L);
@@ -175,5 +180,33 @@ class RepetitionServiceTest {
         when(children.findByIdForUpdate(2L)).thenReturn(Optional.of(Child.create(other, "서아", AgeGroup.AGE_5)));
         error("CHILD403", 7L, 2L, 1L);
         verifyNoInteractions(cards);
+        verifyNoInteractions(tts);
+    }
+
+    @Test
+    void ttsFailureAfterAcquisitionKeepsCardAndReturnsBothTexts() {
+        ownedWord();
+        allowAcquisition();
+        when(stt.transcribe(audio)).thenReturn("적금");
+        when(tts.synthesize(anyString())).thenThrow(new IllegalStateException("TTS unavailable"));
+        LearnedWord card = LearnedWord.create(child, word, false);
+        ReflectionTestUtils.setField(card, "id", 35L);
+        card.markAsViewed();
+        when(cards.findByChild_IdAndWord_Id(2L, 1L)).thenReturn(Optional.of(card));
+
+        var result = service.repeat(7L, 2L, 1L, audio);
+
+        assertThat(result.isCorrect()).isTrue();
+        assertThat(result.learnedWordId()).isEqualTo(35L);
+        assertThat(card.isStickerEarned()).isTrue();
+        assertThat(card.isNew()).isFalse();
+        assertThat(result.repetitionDialogue().text()).isEqualTo("우와! 적금! 잘했어!");
+        assertThat(result.acquisitionDialogue().text()).isEqualTo("이미 수첩에 있는 단어야!");
+        assertThat(result.repetitionDialogue().audioBase64()).isNull();
+        assertThat(result.acquisitionDialogue().audioBase64()).isNull();
+        var order = inOrder(children, tts);
+        order.verify(children).findByIdForUpdate(2L);
+        order.verify(tts).synthesize("우와! 적금! 잘했어!");
+        order.verify(tts).synthesize("이미 수첩에 있는 단어야!");
     }
 }

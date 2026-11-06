@@ -23,6 +23,7 @@ public class RepetitionService {
     private final SttService sttService;
     private final RepetitionEvaluationService evaluationService;
     private final WordCardAcquisitionService acquisitionService;
+    private final RepetitionDialogueService dialogueService;
 
     public RepetitionResponse repeat(Long userId, Long childId, Long wordId, MultipartFile audio) {
         if (userId == null || userId <= 0) {
@@ -44,10 +45,12 @@ public class RepetitionService {
 
         String recognizedText = transcribe(audio);
         var evaluation = evaluationService.evaluate(recognizedText, word.getWord(), child.getAgeGroup());
-        // 외부 호출이 끝난 뒤 별도 트랜잭션에서 카드 저장 및 소유권 재확인
+        // STT 호출이 끝난 뒤 별도 트랜잭션에서 카드 저장 및 소유권 재확인
         var acquisition = acquisitionService.acquireCard(userId, childId, wordId, evaluation.isCorrect());
         return new RepetitionResponse(wordId, acquisition.learnedWordId(),
-                evaluation.isCorrect(), acquisition.isNewAcquisition());
+                evaluation.isCorrect(), acquisition.isNewAcquisition(),
+                dialogueService.repetition(word.getWord(), evaluation.isCorrect()),
+                dialogueService.acquisition(acquisition.isNewAcquisition()));
     }
 
     private String transcribe(MultipartFile audio) {
