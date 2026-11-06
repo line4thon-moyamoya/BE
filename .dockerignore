@@ -12,3 +12,9 @@ out
 Dockerfile*
 docker-compose*.yml
 DEPLOY.md
+secrets
+**/secrets
+**/moyamoya-tts-*.json
+**/google-tts.json
+**/.venv
+**/__pycache__

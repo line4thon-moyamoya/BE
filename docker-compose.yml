@@ -11,9 +11,27 @@ services:
       TZ: Asia/Seoul
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./deploy/mysql-init.sql:/docker-entrypoint-initdb.d/01-consents.sql:ro
+      - type: bind
+        source: ./deploy/mysql-init.sql
+        target: /docker-entrypoint-initdb.d/01-consents.sql
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - backend
+
+  tts-processor:
+    build:
+      context: ./tts-processor
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/openapi.json', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -30,8 +48,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      tts-processor:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       DB_URL: jdbc:mysql://db:3306/moyamoya?serverTimezone=UTC&characterEncoding=UTF-8&useUnicode=true
       DB_USERNAME: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
@@ -40,8 +60,22 @@ services:
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL}
       PARENT_MODE_TOKEN_TTL: ${PARENT_MODE_TOKEN_TTL}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      CLOVA_SPEECH_INVOKE_URL: ${CLOVA_SPEECH_INVOKE_URL:?Set CLOVA_SPEECH_INVOKE_URL}
+      CLOVA_SPEECH_SECRET_KEY: ${CLOVA_SPEECH_SECRET_KEY:?Set CLOVA_SPEECH_SECRET_KEY}
+      TTS_PROCESSOR_URL: http://tts-processor:8001
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:?Set AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      AWS_S3_PREFIX: ${AWS_S3_PREFIX:-prod}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-tts.json
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
       TZ: Asia/Seoul
+    volumes:
+      - type: bind
+        source: ${GOOGLE_TTS_CREDENTIALS_FILE:-/opt/moyamoya/secrets/google-tts.json}
+        target: /run/secrets/google-tts.json
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "${APP_PORT:-8080}:8080"
     networks:
