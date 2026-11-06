@@ -4,6 +4,8 @@ EC2에서 저장소 루트를 기준으로 실행한다. Docker Compose와 서�
 
 ## 최초 실행
 
+운영 프로필은 `ddl-auto: validate`로 스키마를 검증하며 테이블을 자동 생성하거나 변경하지 않는다. 최초 실행 전 전체 애플리케이션 스키마를 별도의 SQL 마이그레이션으로 준비해야 한다. `mysql-init.sql`은 동의 테이블과 초기 데이터만 준비하므로 이것만으로는 신규 DB에서 앱을 기동할 수 없다. 기존 DB도 스키마 변경이 있으면 백업 후 명시적 마이그레이션을 먼저 적용한다.
+
 ```bash
 docker compose config --quiet
 docker compose build

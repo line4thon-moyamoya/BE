@@ -67,7 +67,6 @@ services:
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_S3_PREFIX: ${AWS_S3_PREFIX:-prod}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-tts.json
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       TZ: Asia/Seoul
     volumes:
       - type: bind
