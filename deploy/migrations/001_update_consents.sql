@@ -1,4 +1,3 @@
--- 기존 ID와 동의 기록은 유지하고 문구를 갱신한다.
 SET NAMES utf8mb4;
 START TRANSACTION;
 
