@@ -28,3 +28,6 @@ parent-pin:
 tts:
   processor-url: http://127.0.0.1:8001
 
+aws:
+  s3:
+    prefix: ${S3_PREFIX:local}

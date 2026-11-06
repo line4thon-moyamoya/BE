@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Component
 public class PythonAudioProcessorClient {
@@ -40,13 +41,21 @@ public class PythonAudioProcessorClient {
 
         body.add("audio", new HttpEntity<>(resource, headers));
 
-        // Python Parselmouth 서버 호출
-        byte[] processed = restClient.post()
-                .uri("/process")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(body)
-                .retrieve()
-                .body(byte[].class);
+        byte[] processed;
+        try {
+            // Python Parselmouth 서버 호출
+            processed = restClient.post()
+                    .uri("/process")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientException exception) {
+            throw new IllegalStateException(
+                    "TTS 후처리 서버 호출에 실패했습니다.",
+                    exception
+            );
+        }
 
         if (processed == null || processed.length == 0) {
             throw new IllegalStateException(
