@@ -11,13 +11,12 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {WordController.class, WordCardController.class, RepetitionController.class})
 public class WordExceptionHandler {
-    @ExceptionHandler({MissingServletRequestPartException.class, MaxUploadSizeExceededException.class})
+    @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<BaseResponse<Void>> handleInvalidAudio(Exception exception) {
         RepetitionErrorCode error = RepetitionErrorCode.INVALID_AUDIO;
         return ResponseEntity.status(error.getHttpStatus())
