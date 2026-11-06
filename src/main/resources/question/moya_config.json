@@ -1,0 +1,276 @@
+{
+  "version": "2026-10-21",
+  "source": "노션 '데이터 모음' 페이지 + 10/21 단어·발음규칙 엑셀",
+  "profile": {
+    "tone": {
+      "values": [
+        "age_3_4",
+        "age_5"
+      ],
+      "default": "age_3_4"
+    },
+    "transform": {
+      "values": [
+        "basic",
+        "car",
+        "princess"
+      ],
+      "default": "basic"
+    },
+    "heard_from": {
+      "values": [
+        "tv",
+        "parent",
+        "book",
+        "kindergarten"
+      ],
+      "labels": {
+        "tv": "TV·유튜브",
+        "parent": "엄마아빠",
+        "book": "책",
+        "kindergarten": "유치원"
+      }
+    },
+    "consent": {
+      "default": false,
+      "store_timestamp": true
+    },
+    "sticker": {
+      "default": false,
+      "set_true_when": "따라 말하기 성공"
+    }
+  },
+  "timing": {
+    "f1_silence_stop_sec": 1.5,
+    "f1_max_record_sec": 10,
+    "f1_too_short_sec": 1.0,
+    "f1_to_next_screen_max_sec": 3,
+    "f2_candidate_cards": {
+      "min": 1,
+      "max": 3
+    },
+    "f2_max_reasks": 2,
+    "f3_word_to_audio_max_sec": 2,
+    "f3_repeat_mic_max_sec": 5,
+    "f3_repeat_reaction_max_sec": 2,
+    "f4_coupons_per_song": 5,
+    "f4_slots": 10,
+    "f4_coupon5_to_play_max_sec": 3
+  },
+  "tts": {
+    "speed": {
+      "age_3_4": 0.85,
+      "age_5": 1.0
+    },
+    "number_words": {
+      "1": "한",
+      "2": "두",
+      "3": "세",
+      "4": "네",
+      "5": "다섯"
+    }
+  },
+  "josa_placeholders": {
+    "{이/가}": [
+      "이",
+      "가"
+    ],
+    "{은/는}": [
+      "은",
+      "는"
+    ],
+    "{이야/야}": [
+      "이야",
+      "야"
+    ],
+    "{을/를}": [
+      "을",
+      "를"
+    ],
+    "{과/와}": [
+      "과",
+      "와"
+    ],
+    "{이라고/라고}": [
+      "이라고",
+      "라고"
+    ],
+    "_rule": "앞 글자에 받침이 있으면 첫 번째, 없으면 두 번째. 받침 = (글자코드 - 44032) % 28 != 0"
+  },
+  "f1": {
+    "vocative_regex": "^(엄마|아빠|선생님|모야)(야|아)?,?\\s+",
+    "quote_regex": "(\\S+)라고 (했는데|하던데|했어)",
+    "raneun_regex": "(\\S+)라는 게 뭐야$",
+    "tails_longest_first": [
+      "무슨 뜻인지 알려줘",
+      "무슨 말인지 알려줘",
+      "무슨 뜻이야",
+      "무슨 말이야",
+      "뭔지 알려줘",
+      "뜻이 뭐예요",
+      "뜻이 뭐에요",
+      "뜻이 뭐야",
+      "뜻이 머야",
+      "뜻이 뭘까",
+      "그게 뭐야",
+      "어떤 거야",
+      "어떤 뜻이야",
+      "뭐라고 하는 거야",
+      "설명해 줘",
+      "설명해줘",
+      "알려 주세요",
+      "알려주세요",
+      "알려 줘",
+      "알려줘",
+      "뭐예요",
+      "뭐에요",
+      "뭐야",
+      "머야",
+      "모야",
+      "뭘까",
+      "뭘까요",
+      "뭔데",
+      "뭐지",
+      "뭐임"
+    ],
+    "no_tail": "말 전체를 단어로 보고 F2로. 후보가 없으면 '질문 아님'",
+    "pointing_words": [
+      "이거",
+      "이게",
+      "이건",
+      "저거",
+      "저게",
+      "저건",
+      "그거",
+      "그게",
+      "그건"
+    ],
+    "pointing_regex": "^(이|저|그) \\S+$"
+  },
+  "f2_josa": {
+    "suffixes": [
+      {
+        "josa": "이가",
+        "needs_batchim": true
+      },
+      {
+        "josa": "이야",
+        "needs_batchim": true
+      },
+      {
+        "josa": "이",
+        "needs_batchim": true
+      },
+      {
+        "josa": "은",
+        "needs_batchim": true
+      },
+      {
+        "josa": "가",
+        "needs_batchim": false
+      },
+      {
+        "josa": "야",
+        "needs_batchim": false
+      },
+      {
+        "josa": "는",
+        "needs_batchim": false
+      }
+    ],
+    "order": [
+      "원래 말 + 조사를 하나씩 뗀 형태를 후보 형태로 만든다",
+      "사전과 정확히 맞는 형태가 1개면 그 단어, 2개 이상이면(길/길이) 둘 다 카드로",
+      "맞는 형태가 없으면 모든 형태를 틀린 발음 표·자모 점수에 넣고 가장 좋은 점수",
+      "띄어쓰기가 있고 사전에 없으면 마지막 어절로 반복"
+    ]
+  },
+  "badwords": {
+    "file": "moya_badwords_ko_564.txt",
+    "len_le_2": "어절 전체가 같을 때만",
+    "len_ge_3": "어절 안에 포함되면",
+    "skip_dictionary_words": true,
+    "check": [
+      "F1 질문 글자",
+      "F3 설명·대사"
+    ]
+  },
+  "f4_song": {
+    "templates": {
+      "1": [
+        "[단어1], [단어1], 그게 뭐야?",
+        "[설명1]",
+        "[단어2], [단어2], 그게 뭐야?",
+        "[설명2]",
+        "[단어3], [단어3], 그게 뭐야?",
+        "[설명3]",
+        "[단어4], [단어4], 그게 뭐야?",
+        "[설명4]",
+        "[단어5], [단어5], 그게 뭐야?",
+        "[설명5]"
+      ],
+      "2": [
+        "[단어1]! [단어1]! 이건 뭘까?",
+        "[설명1]",
+        "[단어2]! [단어2]! 이건 뭘까?",
+        "[설명2]",
+        "[단어3]! [단어3]! 이건 뭘까?",
+        "[설명3]",
+        "[단어4]! [단어4]! 이건 뭘까?",
+        "[설명4]",
+        "[단어5]! [단어5]! 이건 뭘까?",
+        "[설명5]"
+      ]
+    },
+    "outro_in_backing_track": "다섯 개 지구 말, 이제 다 알았다!",
+    "slot_rule": "홀수 칸 = 단어(match_key), 짝수 칸 = 그 단어의 song_line. 쿠폰이 찍힌 순서대로 단어1~5",
+    "songs": [
+      {
+        "id": 1,
+        "transform": "basic",
+        "template": null,
+        "file": null,
+        "slot_start_sec": null
+      },
+      {
+        "id": 2,
+        "transform": "car",
+        "template": null,
+        "file": null,
+        "slot_start_sec": null
+      },
+      {
+        "id": 3,
+        "transform": "princess",
+        "template": null,
+        "file": null,
+        "slot_start_sec": null
+      },
+      {
+        "id": 4,
+        "transform": null,
+        "note": "가요풍 반주 (제안)",
+        "template": null,
+        "file": null,
+        "slot_start_sec": null
+      }
+    ],
+    "_todo": "template·file·slot_start_sec 는 추가예정 (README 참고)"
+  },
+  "demo": {
+    "prefill_coupons": [
+      "환기",
+      "충전",
+      "소독",
+      "알림장"
+    ],
+    "live_question": "아까 아빠가 구케이원이라고 했는데 그게 뭐야?",
+    "live_answer": "국회의원",
+    "_note": "Claude 제안, 기획 확정 필요"
+  },
+  "parent_gate": {
+    "type": "덧셈 문제 1개 (두 자리 + 한 자리)",
+    "input": "숫자 키패드",
+    "on_wrong": "새 문제, 횟수 제한 없음"
+  }
+}
