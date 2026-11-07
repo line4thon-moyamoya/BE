@@ -121,6 +121,9 @@ public final class AudioMimeTypeSupport {
         if (isWav(audioBytes)) {
             return "audio/wav";
         }
+        if (isAdts(audioBytes)) {
+            return null;
+        }
         if (isMp3(audioBytes)) {
             return "audio/mpeg";
         }
@@ -131,6 +134,18 @@ public final class AudioMimeTypeSupport {
             return "audio/mp4";
         }
         return null;
+    }
+
+    private static boolean isAdts(byte[] bytes) {
+        if (bytes == null || bytes.length < 7) {
+            return false;
+        }
+
+        int b0 = bytes[0] & 0xFF;
+        int b1 = bytes[1] & 0xFF;
+
+        return b0 == 0xFF
+                && (b1 & 0xF6) == 0xF0;
     }
 
     private static boolean isWav(byte[] bytes) {

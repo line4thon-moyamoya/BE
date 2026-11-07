@@ -108,6 +108,19 @@ class AudioMimeTypeSupportTest {
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void rejectsAdtsEvenWhenDeclaredAsMp3() {
+        MockMultipartFile file = new MockMultipartFile(
+                "audio",
+                "voice.mp3",
+                "audio/mpeg",
+                adtsBytes()
+        );
+
+        assertThatThrownBy(() -> AudioMimeTypeSupport.validateAndResolveForAnalyze(file))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private byte[] wavBytes() {
         return new byte[]{
                 'R', 'I', 'F', 'F', 0x24, 0x00, 0x00, 0x00,
@@ -131,6 +144,13 @@ class AudioMimeTypeSupportTest {
         return new byte[]{
                 0x00, 0x00, 0x00, 0x18, 'f', 't', 'y', 'p',
                 'M', '4', 'A', ' ', 0x00, 0x00, 0x00, 0x00
+        };
+    }
+
+    private byte[] adtsBytes() {
+        return new byte[]{
+                (byte) 0xFF, (byte) 0xF1, 0x50, (byte) 0x80,
+                0x00, 0x1F, (byte) 0xFC, 0x00
         };
     }
 }
