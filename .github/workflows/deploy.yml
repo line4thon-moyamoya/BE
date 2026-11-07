@@ -35,9 +35,13 @@ jobs:
           : "${EC2_SSH_KEY:?Set EC2_SSH_KEY in Actions secrets}"
           : "${EC2_KNOWN_HOSTS:?Set EC2_KNOWN_HOSTS in Actions secrets}"
           install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/deploy_key"
-          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$EC2_SSH_KEY" | tr -d '\r' > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$EC2_KNOWN_HOSTS" | tr -d '\r' > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+          if ! ssh-keygen -y -P '' -f "$HOME/.ssh/deploy_key" > /dev/null 2>&1; then
+            echo 'Invalid EC2_SSH_KEY: paste the complete private key, including BEGIN/END lines. This workflow requires a key without a passphrase.' >&2
+            exit 1
+          fi
       - name: Deploy tested commit and verify API
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
