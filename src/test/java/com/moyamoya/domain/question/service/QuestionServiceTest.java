@@ -30,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QuestionServiceTest {
@@ -275,6 +277,63 @@ class QuestionServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void findSecondCandidatesKeepsSessionStateWhenDialogueTtsFails() {
+        QuestionSession session = QuestionSession.create(1L, "엄마 저끔이 뭐야?", null);
+        session.setExtractionResult("저끔", List.of("저끔"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "CURATED:적금",
+                null,
+                "적금",
+                WordSourceType.CURATED,
+                0.9,
+                0.0,
+                0.9,
+                "정의",
+                null,
+                null,
+                null
+        )));
+
+        List<WordCandidate> secondCandidates = List.of(new WordCandidate(
+                "CURATED:연금",
+                null,
+                "연금",
+                WordSourceType.CURATED,
+                0.8,
+                0.6,
+                0.75,
+                "정의2",
+                null,
+                null,
+                null
+        ));
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        stubChildOwnership(1L, 1L);
+        when(rankingService.rankSecond(
+                List.of("저끔"),
+                "엄마 저끔이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of("CURATED:적금")
+        )).thenReturn(secondCandidates);
+        when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+        when(moyaTtsService.synthesize(any()))
+                .thenThrow(new IllegalStateException("tts failed"));
+
+        assertThatThrownBy(() -> questionService.findSecondCandidates(
+                1L,
+                session.getSessionId().toString(),
+                HeardFrom.PARENTS
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+
+        assertThat(session.getStatus()).isEqualTo(com.moyamoya.domain.question.session.QuestionSessionStatus.FIRST_CANDIDATES_READY);
+        verify(sessionStore, never()).save(session);
     }
 
     @Test

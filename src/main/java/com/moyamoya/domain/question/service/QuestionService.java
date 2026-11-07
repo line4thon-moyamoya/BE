@@ -167,41 +167,33 @@ public class QuestionService {
                 throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
             }
 
+            String dialogueAudioBase64 = null;
+            if (!candidatesWithTts.isEmpty()) {
+                String dialogueText = QuestionCandidateResponse.buildDialogue(
+                        candidatesWithTts.stream()
+                                .map(com.moyamoya.domain.question.dto.response.CandidateResponse::from)
+                                .toList()
+                );
+                try {
+                    byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
+                    dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+                } catch (RuntimeException e) {
+                    throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                }
+            }
+
             try {
                 session.setSecondCandidates(context, candidatesWithTts);
             } catch (IllegalArgumentException | IllegalStateException exception) {
                 throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
             }
             sessionStore.save(session);
-        }
-
-        List<WordCandidate> secondCandidates = session.getSecondCandidatesForClient();
-        if (secondCandidates.isEmpty()) {
             return SecondCandidateResponse.of(
                     session.getSessionId().toString(),
-                    secondCandidates
+                    session.getSecondCandidatesForClient(),
+                    dialogueAudioBase64
             );
         }
-
-        String dialogueText = QuestionCandidateResponse.buildDialogue(
-                secondCandidates.stream()
-                        .map(com.moyamoya.domain.question.dto.response.CandidateResponse::from)
-                        .toList()
-        );
-
-        String dialogueAudioBase64;
-        try {
-            byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
-            dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
-        } catch (RuntimeException e) {
-            throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
-        }
-
-        return SecondCandidateResponse.of(
-                session.getSessionId().toString(),
-                secondCandidates,
-                dialogueAudioBase64
-        );
     }
 
     private QuestionCandidateResponse runFirstCandidateFlow(

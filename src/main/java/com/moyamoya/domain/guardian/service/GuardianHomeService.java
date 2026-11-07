@@ -28,7 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GuardianHomeService {
 
-    private static final ZoneId APP_ZONE = ZoneId.systemDefault();
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Seoul");
 
     private final UserRepository userRepository;
     private final ChildRepository childRepository;
