@@ -17,6 +17,8 @@ public interface LearnedWordRepository extends JpaRepository<LearnedWord, Long> 
     @EntityGraph(attributePaths = "word")
     Optional<LearnedWord> findByIdAndChild_Id(Long learnedWordId, Long childId);
 
+    long countByChild_Id(Long childId);
+
     @Query("""
             select lw from LearnedWord lw
             join fetch lw.word

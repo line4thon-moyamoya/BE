@@ -3,6 +3,8 @@ package com.moyamoya.domain.child.repository;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
+
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -16,4 +18,6 @@ public interface ChildRepository extends JpaRepository<Child, Long> {
     Optional<Child> findByIdForUpdate(@Param("childId") Long childId);
 
     Optional<Child> findFirstByUserOrderByIdAsc(User user);
+
+    List<Child> findByUserIdOrderByIdAsc(Long userId);
 }

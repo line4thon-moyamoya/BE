@@ -13,7 +13,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.Locale;
 
 @Service
 public class SttService {
@@ -84,24 +83,9 @@ public class SttService {
     }
 
     private void validateAudio(MultipartFile audio) {
-        if (audio == null || audio.isEmpty()) {
-            throw new CustomException(
-                    QuestionErrorCode.INVALID_AUDIO_FILE
-            );
-        }
-
-        if (audio.getSize() > 10 * 1024 * 1024) {
-            throw new CustomException(
-                    QuestionErrorCode.INVALID_AUDIO_FILE
-            );
-        }
-
-        String filename = audio.getOriginalFilename();
-
-        if (filename == null ||
-                !filename.toLowerCase(Locale.ROOT).matches(
-                        ".*\\.(wav|mp3|m4a|ogg|flac|aac|ac3)$"
-                )) {
+        try {
+            AudioMimeTypeSupport.validateAndResolveForAnalyze(audio);
+        } catch (IllegalArgumentException exception) {
             throw new CustomException(
                     QuestionErrorCode.INVALID_AUDIO_FILE
             );

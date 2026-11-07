@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
 import java.util.Set;
@@ -45,12 +46,18 @@ public class QuestionService {
     private final WordRepository wordRepository;
     private final ChildRepository childRepository;
     private final UserRepository userRepository;
+    private final QuestionAudioTempService audioTempService;
 
     public QuestionCandidateResponse testStt(
             Long childId,
             String recognizedSentence
     ) {
-        return runFirstCandidateFlow(childId, recognizedSentence);
+        return runFirstCandidateFlow(
+                childId,
+                recognizedSentence,
+                null,
+                null
+        );
     }
 
     public QuestionCandidateResponse analyzeAudio(
@@ -59,13 +66,54 @@ public class QuestionService {
             MultipartFile audio
     ) {
         if (userId == null) {
-            throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+            throw new CustomException(
+                    QuestionErrorCode.INVALID_QUESTION_REQUEST
+            );
         }
 
         verifyChildOwnership(userId, childId);
 
-        String recognizedSentence = sttService.transcribe(audio);
-        return runFirstCandidateFlow(childId, recognizedSentence);
+        if (audio == null || audio.isEmpty()) {
+            throw new CustomException(
+                    QuestionErrorCode.INVALID_QUESTION_REQUEST
+            );
+        }
+
+        String normalizedContentType;
+        try {
+            normalizedContentType = AudioMimeTypeSupport
+                    .validateAndResolveForAnalyze(audio);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(
+                    QuestionErrorCode.INVALID_AUDIO_FILE
+            );
+        }
+
+        Path tempPath;
+        try {
+            // 원본 음성 임시 저장
+            tempPath = audioTempService.save(audio);
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            throw new CustomException(QuestionErrorCode.AUDIO_TEMP_SAVE_FAILED);
+        }
+
+        try {
+            // 기존 STT 분석
+            String recognizedSentence = sttService.transcribe(audio);
+
+            // 후보 생성 + 세션에 원본 음성 연결
+            return runFirstCandidateFlow(
+                    childId,
+                    recognizedSentence,
+                    tempPath,
+                    normalizedContentType
+            );
+
+        } catch (RuntimeException e) {
+            // 세션 생성 전 실패 시 임시 파일 정리
+            audioTempService.delete(tempPath);
+            throw e;
+        }
     }
 
     public SecondCandidateResponse findSecondCandidates(
@@ -127,15 +175,40 @@ public class QuestionService {
             sessionStore.save(session);
         }
 
+        List<WordCandidate> secondCandidates = session.getSecondCandidatesForClient();
+        if (secondCandidates.isEmpty()) {
+            return SecondCandidateResponse.of(
+                    session.getSessionId().toString(),
+                    secondCandidates
+            );
+        }
+
+        String dialogueText = QuestionCandidateResponse.buildDialogue(
+                secondCandidates.stream()
+                        .map(com.moyamoya.domain.question.dto.response.CandidateResponse::from)
+                        .toList()
+        );
+
+        String dialogueAudioBase64;
+        try {
+            byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
+            dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+        } catch (RuntimeException e) {
+            throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+        }
+
         return SecondCandidateResponse.of(
                 session.getSessionId().toString(),
-                session.getSecondCandidatesForClient()
+                secondCandidates,
+                dialogueAudioBase64
         );
     }
 
     private QuestionCandidateResponse runFirstCandidateFlow(
             Long childId,
-            String recognizedSentence
+            String recognizedSentence,
+            Path tempPath,
+            String contentType
     ) {
         if (childId == null) {
             throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
@@ -152,6 +225,11 @@ public class QuestionService {
                 sentence,
                 null
         );
+
+        // 원본 음성 임시 파일 연결
+        if (tempPath != null) {
+            session.attachOriginalAudio(tempPath, contentType);
+        }
 
         QuestionExtractionResult extraction = targetExtractor.extract(sentence);
 

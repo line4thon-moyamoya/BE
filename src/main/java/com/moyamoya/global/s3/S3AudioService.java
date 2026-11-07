@@ -9,6 +9,7 @@ import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
@@ -28,7 +29,17 @@ public class S3AudioService {
     private String keyPrefix;
 
     public String uploadWav(String key, byte[] wav) {
-        if (key == null || key.isBlank() || wav == null || wav.length == 0) {
+        return uploadAudio(key, wav, "audio/wav");
+    }
+
+    public String uploadAudio(
+            String key,
+            byte[] audioBytes,
+            String contentType
+    ) {
+        if (key == null || key.isBlank()
+                || audioBytes == null || audioBytes.length == 0
+                || contentType == null || contentType.isBlank()) {
             throw new IllegalArgumentException("업로드할 음성 데이터가 올바르지 않습니다.");
         }
 
@@ -37,13 +48,13 @@ public class S3AudioService {
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(uploadKey)
-                .contentType("audio/wav")
+                .contentType(contentType)
                 .build();
 
         try {
             s3Client.putObject(
                     request,
-                    RequestBody.fromBytes(wav)
+                    RequestBody.fromBytes(audioBytes)
             );
         } catch (SdkException exception) {
             throw new IllegalStateException("S3 음성 업로드에 실패했습니다.", exception);
@@ -98,5 +109,26 @@ public class S3AudioService {
         }
 
         return prefixWithSlash + normalizedKey;
+    }
+
+    // S3에 업로드한 음성 파일 삭제
+    public void deleteObject(String uploadedKey) {
+        if (uploadedKey == null || uploadedKey.isBlank()) {
+            return;
+        }
+
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(uploadedKey)
+                .build();
+
+        try {
+            s3Client.deleteObject(request);
+        } catch (SdkException exception) {
+            throw new IllegalStateException(
+                    "S3 음성 삭제에 실패했습니다.",
+                    exception
+            );
+        }
     }
 }
