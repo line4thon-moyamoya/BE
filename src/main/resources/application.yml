@@ -22,7 +22,7 @@ server:
       force: true
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,https://line4thon-moyamoya.vercel.app}
 
 jwt:
   secret: ${JWT_SECRET}

@@ -6,10 +6,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.LocalDateTime;
 
 @Entity
+@DynamicUpdate
 @Table(
         name = "learned_words",
         uniqueConstraints = {
@@ -61,5 +63,9 @@ public class LearnedWord {
 
     public void markAsViewed() {
         this.isNew = false;
+    }
+
+    public void earnSticker() {
+        this.stickerEarned = true;
     }
 }
