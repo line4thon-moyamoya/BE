@@ -79,6 +79,16 @@ public class QuestionService {
             );
         }
 
+        String normalizedContentType;
+        try {
+            normalizedContentType = AudioMimeTypeSupport
+                    .validateAndResolveForAnalyze(audio);
+        } catch (IllegalArgumentException exception) {
+            throw new CustomException(
+                    QuestionErrorCode.INVALID_AUDIO_FILE
+            );
+        }
+
         Path tempPath;
         try {
             // 원본 음성 임시 저장
@@ -96,7 +106,7 @@ public class QuestionService {
                     childId,
                     recognizedSentence,
                     tempPath,
-                    audio.getContentType()
+                    normalizedContentType
             );
 
         } catch (RuntimeException e) {
@@ -165,9 +175,32 @@ public class QuestionService {
             sessionStore.save(session);
         }
 
+        List<WordCandidate> secondCandidates = session.getSecondCandidatesForClient();
+        if (secondCandidates.isEmpty()) {
+            return SecondCandidateResponse.of(
+                    session.getSessionId().toString(),
+                    secondCandidates
+            );
+        }
+
+        String dialogueText = QuestionCandidateResponse.buildDialogue(
+                secondCandidates.stream()
+                        .map(com.moyamoya.domain.question.dto.response.CandidateResponse::from)
+                        .toList()
+        );
+
+        String dialogueAudioBase64;
+        try {
+            byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
+            dialogueAudioBase64 = Base64.getEncoder().encodeToString(dialogueAudio);
+        } catch (RuntimeException e) {
+            throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+        }
+
         return SecondCandidateResponse.of(
                 session.getSessionId().toString(),
-                session.getSecondCandidatesForClient()
+                secondCandidates,
+                dialogueAudioBase64
         );
     }
 

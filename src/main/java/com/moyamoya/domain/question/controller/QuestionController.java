@@ -82,7 +82,8 @@ public class QuestionController {
                 "dialogue": {
                   "text": "적금? 예금? 어떤 거야?",
                   "audioUrl": null,
-                  "audioBase64": "UklGRiQAAABXQVZF..."
+                  "audioBase64": "UklGRiQAAABXQVZF...",
+                  "audioContentType": "audio/wav"
                 },
                 "nextStep": "CANDIDATE_SELECTION"
               }
@@ -184,6 +185,12 @@ public class QuestionController {
                     "descriptionAudioBase64": null
                   }
                 ],
+                "dialogue": {
+                  "text": "연금 말하는 거야?",
+                  "audioUrl": null,
+                  "audioBase64": "UklGRiQAAABXQVZF...",
+                  "audioContentType": "audio/wav"
+                },
                 "nextStep": "FINAL_CANDIDATE_SELECTION"
               }
             }
@@ -198,6 +205,7 @@ public class QuestionController {
                 "status": "NO_CANDIDATE",
                 "candidateCount": 0,
                 "candidates": [],
+                "dialogue": null,
                 "nextStep": "WORD_REQUEST"
               }
             }

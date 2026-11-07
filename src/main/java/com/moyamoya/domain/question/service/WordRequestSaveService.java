@@ -98,17 +98,33 @@ public class WordRequestSaveService {
                 throw new CustomException(QuestionErrorCode.WORD_REQUEST_SAVE_FAILED);
             }
 
+            String normalizedContentType;
+            try {
+                normalizedContentType = AudioMimeTypeSupport.validateAndResolve(
+                        session.getOriginalAudioContentType(),
+                        audioBytes
+                );
+            } catch (IllegalArgumentException exception) {
+                throw new CustomException(QuestionErrorCode.INVALID_AUDIO_FILE);
+            }
+
+            String extension = AudioMimeTypeSupport.extensionOf(
+                    normalizedContentType
+            );
+
             String key = "questions/original/"
                     + session.getChildId()
                     + "/"
                     + session.getSessionId()
-                    + ".wav";
+                    + "."
+                    + extension;
 
             String uploadedKey;
             try {
-                uploadedKey = s3AudioService.uploadWav(
+                uploadedKey = s3AudioService.uploadAudio(
                         key,
-                        audioBytes
+                        audioBytes,
+                        normalizedContentType
                 );
             } catch (RuntimeException exception) {
                 throw new CustomException(QuestionErrorCode.WORD_REQUEST_SAVE_FAILED);

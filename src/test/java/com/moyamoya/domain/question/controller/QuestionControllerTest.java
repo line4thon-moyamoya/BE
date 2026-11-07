@@ -78,7 +78,7 @@ class QuestionControllerTest {
                         "https://example.com/description-audio",
                         null
                 )),
-                new QuestionCandidateResponse.Dialogue("적금 말하는 거야?", null, "base64-audio"),
+                new QuestionCandidateResponse.Dialogue("적금 말하는 거야?", null, "base64-audio", "audio/wav"),
                 "CANDIDATE_SELECTION"
         );
         when(questionService.analyzeAudio(eq(7L), eq(2L), any())).thenReturn(response);
@@ -99,7 +99,8 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.message").value("1차 단어 후보를 조회했습니다."))
                 .andExpect(jsonPath("$.data.sessionId").value(sessionId.toString()))
                 .andExpect(jsonPath("$.data.candidateCount").value(1))
-                .andExpect(jsonPath("$.data.candidates[0].candidateId").value("c_001"));
+                .andExpect(jsonPath("$.data.candidates[0].candidateId").value("c_001"))
+                .andExpect(jsonPath("$.data.dialogue.audioContentType").value("audio/wav"));
 
         verify(questionService).analyzeAudio(eq(7L), eq(2L), any());
     }
@@ -122,6 +123,12 @@ class QuestionControllerTest {
                                 null,
                                 "base64-desc"
                         )),
+                        new SecondCandidateResponse.Dialogue(
+                                "예금 말하는 거야?",
+                                null,
+                                "base64-dialogue",
+                                "audio/wav"
+                        ),
                         "FINAL_CANDIDATE_SELECTION"
                 ));
 
@@ -138,7 +145,8 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.message").value("2차 단어 후보를 조회했습니다."))
                 .andExpect(jsonPath("$.data.sessionId").value("session-1"))
-                .andExpect(jsonPath("$.data.candidateCount").value(1));
+                .andExpect(jsonPath("$.data.candidateCount").value(1))
+                .andExpect(jsonPath("$.data.dialogue.audioContentType").value("audio/wav"));
     }
 
     @Test

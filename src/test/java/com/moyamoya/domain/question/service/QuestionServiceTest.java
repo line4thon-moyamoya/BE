@@ -16,6 +16,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,6 +123,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().wordAudioUrl())
                 .isEqualTo("https://audio.example/word.wav");
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
+        assertThat(response.dialogue()).isNotNull();
+        assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
     }
 
     @Test
@@ -175,6 +178,8 @@ class QuestionServiceTest {
         assertThat(response.status()).isEqualTo("CANDIDATES_FOUND");
         assertThat(response.candidates()).hasSize(1);
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
+        assertThat(response.dialogue()).isNotNull();
+        assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
     }
 
     @Test
@@ -274,8 +279,17 @@ class QuestionServiceTest {
 
     @Test
     void analyzeAudioThrowsAudioTempSaveFailedWhenTempSaveFails() {
-        MultipartFile audio = mock(MultipartFile.class);
-        when(audio.isEmpty()).thenReturn(false);
+        MultipartFile audio = new MockMultipartFile(
+                "audio",
+                "test.wav",
+                "audio/wav",
+                new byte[]{
+                        'R', 'I', 'F', 'F',
+                        0x24, 0x00, 0x00, 0x00,
+                        'W', 'A', 'V', 'E',
+                        'f', 'm', 't', ' '
+                }
+        );
         when(audioTempService.save(audio))
                 .thenThrow(new IllegalStateException("temp save failed"));
         stubChildOwnership(1L, 1L);
