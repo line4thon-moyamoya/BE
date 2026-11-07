@@ -60,7 +60,7 @@ public final class AudioMimeTypeSupport {
         );
         String detected = detectContentType(audioBytes);
 
-        if (normalizedDeclared == null && detected == null) {
+        if (detected == null) {
             throw new IllegalArgumentException(
                     "지원하지 않는 음성 형식입니다."
             );

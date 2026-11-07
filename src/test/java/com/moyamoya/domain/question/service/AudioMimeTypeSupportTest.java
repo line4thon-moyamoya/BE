@@ -98,6 +98,16 @@ class AudioMimeTypeSupportTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void rejectsInvalidBytesEvenWhenDeclaredAsWav() {
+        byte[] invalidBytes = "not an audio file".getBytes();
+
+        assertThatThrownBy(() -> AudioMimeTypeSupport.validateAndResolve(
+                "audio/wav",
+                invalidBytes
+        )).isInstanceOf(IllegalArgumentException.class);
+    }
+
     private byte[] wavBytes() {
         return new byte[]{
                 'R', 'I', 'F', 'F', 0x24, 0x00, 0x00, 0x00,
