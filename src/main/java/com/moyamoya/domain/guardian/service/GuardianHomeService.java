@@ -28,8 +28,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class GuardianHomeService {
 
-    private static final ZoneId KOREA_ZONE =
-            ZoneId.of("Asia/Seoul");
+    private static final ZoneId APP_ZONE = ZoneId.systemDefault();
 
     private final UserRepository userRepository;
     private final ChildRepository childRepository;
@@ -71,7 +70,7 @@ public class GuardianHomeService {
         Long selectedChildId = selectedChild.getId();
 
         // 이번 주 월요일 ~ 일요일 계산
-        LocalDate today = LocalDate.now(KOREA_ZONE);
+        LocalDate today = LocalDate.now(APP_ZONE);
 
         LocalDate weekStart = today.with(
                 TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)

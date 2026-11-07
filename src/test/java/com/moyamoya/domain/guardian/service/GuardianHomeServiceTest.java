@@ -135,7 +135,7 @@ class GuardianHomeServiceTest {
         GuardianHomeResponse result =
                 guardianHomeService.getHome(1L, null);
 
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
         LocalDate monday = today.with(
                 TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)
         );
