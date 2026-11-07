@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 public interface LearnedWordRepository extends JpaRepository<LearnedWord, Long> {
     Optional<LearnedWord> findByIdAndChild_Id(Long learnedWordId, Long childId);
 
+    long countByChild_Id(Long childId);
+
     @Query("""
             select lw from LearnedWord lw
             join fetch lw.word
