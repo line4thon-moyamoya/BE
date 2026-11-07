@@ -1,0 +1,227 @@
+{
+  "version": "2026-10-21",
+  "description": "모야모야 F2 아동 발음 오류 및 표준 발음 규칙",
+  "rules": [
+    {
+      "id": 1,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅅ"],
+      "to": ["ㄷ"],
+      "position": "INITIAL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["세금:데금", "선거:던거"]
+    },
+    {
+      "id": 2,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅅ"],
+      "to": ["ㅈ"],
+      "position": "INITIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["상담:장담"]
+    },
+    {
+      "id": 3,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅆ"],
+      "to": ["ㄸ"],
+      "position": "INITIAL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["받아쓰기:바다뜨기"]
+    },
+    {
+      "id": 4,
+      "type": "CONSONANT_DELETION",
+      "from": ["ㄹ"],
+      "to": ["ㅇ", ""],
+      "position": "INITIAL_OR_MEDIAL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["로그인:오그인", "배터리:배터이"]
+    },
+    {
+      "id": 5,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㄹ"],
+      "to": ["ㄷ"],
+      "position": "MEDIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["보일러:보이더"]
+    },
+    {
+      "id": 6,
+      "type": "FINAL_CONSONANT_DELETION",
+      "from": ["FINAL_CONSONANT"],
+      "to": [""],
+      "position": "FINAL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["품절:푸절", "통장:토장"]
+    },
+    {
+      "id": 7,
+      "type": "SYLLABLE_DELETION",
+      "from": ["MEDIAL_SYLLABLE"],
+      "to": [""],
+      "position": "MEDIAL",
+      "priority": "MEDIUM",
+      "enabled": false,
+      "examples": ["내비게이션:내게이션", "층간소음:층소음"]
+    },
+    {
+      "id": 8,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㄱ"],
+      "to": ["ㄷ"],
+      "position": "INITIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["기자:디자"]
+    },
+    {
+      "id": 9,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅊ"],
+      "to": ["ㅌ"],
+      "position": "INITIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["충전:툰전"]
+    },
+    {
+      "id": 10,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅈ"],
+      "to": ["ㄷ"],
+      "position": "INITIAL",
+      "priority": "LOW",
+      "enabled": true,
+      "examples": ["지진:디진"]
+    },
+    {
+      "id": 11,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅘ", "ㅝ"],
+      "to": ["ㅏ", "ㅓ"],
+      "position": "VOWEL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["환기:한기", "월급:얼급"]
+    },
+    {
+      "id": 12,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅚ", "ㅙ", "ㅞ"],
+      "to": ["ㅔ"],
+      "position": "VOWEL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["회식:헤식", "퇴근:테근"]
+    },
+    {
+      "id": 13,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅖ", "ㅢ"],
+      "to": ["ㅔ", "ㅣ"],
+      "position": "VOWEL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["예의:에이", "국회의원:구케이언"]
+    },
+    {
+      "id": 14,
+      "type": "CONSONANT_DELETION",
+      "from": ["ㅎ"],
+      "to": [""],
+      "position": "INITIAL_OR_MEDIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["오해:오애", "하원:아원"]
+    },
+    {
+      "id": 15,
+      "type": "PALATALIZED_VOWEL",
+      "from": ["ㅏ", "ㅓ", "ㅗ", "ㅜ", "ㅡ", "ㅣ"],
+      "to": ["ㅑ", "ㅕ", "ㅛ", "ㅠ", "ㅠ", "ㅟ"],
+      "afterInitials": ["ㅅ", "ㅈ", "ㅊ"],
+      "position": "VOWEL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["정수기:졍슈기", "초록색:쵸록색"]
+    },
+    {
+      "id": 16,
+      "type": "FINAL_CONSONANT_SUBSTITUTION",
+      "from": ["ㄴ"],
+      "to": ["ㅇ"],
+      "position": "FINAL",
+      "priority": "HIGH",
+      "enabled": true,
+      "examples": ["선거:성거", "단풍:당풍"]
+    },
+    {
+      "id": 17,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅡ"],
+      "to": ["ㅜ"],
+      "position": "VOWEL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["영수증:영슈중"]
+    },
+    {
+      "id": 18,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㄱ", "ㅈ"],
+      "to": ["ㄲ", "ㅉ"],
+      "position": "MEDIAL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["공구:공꾸", "경제:경쩨"]
+    },
+    {
+      "id": 19,
+      "type": "INITIAL_SUBSTITUTION",
+      "from": ["ㅅ"],
+      "to": ["ㅌ"],
+      "position": "INITIAL",
+      "priority": "LOW",
+      "enabled": true,
+      "examples": ["소방차:토방차"]
+    },
+    {
+      "id": 20,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅛ"],
+      "to": ["ㅗ"],
+      "position": "VOWEL",
+      "priority": "LOW",
+      "enabled": true,
+      "examples": ["투표:투포"]
+    },
+    {
+      "id": 21,
+      "type": "COMPLEX_PHONOLOGICAL_CHANGE",
+      "from": [],
+      "to": [],
+      "position": "VARIABLE",
+      "priority": "LOW",
+      "enabled": false,
+      "examples": ["국정감사:주껑감사", "할부:팔부"]
+    },
+    {
+      "id": 22,
+      "type": "STANDARD_PRONUNCIATION",
+      "from": [],
+      "to": [],
+      "position": "WHOLE_WORD",
+      "priority": "HIGH",
+      "enabled": false,
+      "examples": ["분리수거:불리수거", "적금:저끔", "잡다:자따"]
+    }
+  ]
+}

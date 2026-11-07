@@ -8,9 +8,18 @@ out/
 
 .env
 .env.*
+!.env.example
 src/main/resources/application-local.yml
 
 *.log
 .DS_Store
 Thumbs.db
+
+.venv/
+
+__pycache__/
+*.pyc
+secrets/
+google-tts.json
+moyamoya-tts-*.json
 
