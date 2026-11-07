@@ -9,6 +9,12 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum GuardianErrorCode implements BaseErrorCode {
 
+    INVALID_CHILD_ID(
+            "GUARDIAN400",
+            "올바른 아이 정보를 입력해 주세요.",
+            HttpStatus.BAD_REQUEST
+    ),
+
     INVALID_WORD_REQUEST(
             "GUARDIAN400_INVALID_WORD_REQUEST",
             "올바른 단어를 입력해 주세요.",
