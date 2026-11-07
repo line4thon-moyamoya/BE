@@ -86,7 +86,7 @@ class QuestionConfirmServiceTest {
         )));
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
-        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
         stubChildOwnership(1L, 1L);
 
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
