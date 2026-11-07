@@ -3,6 +3,7 @@ package com.moyamoya.domain.guardian.controller;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -58,7 +59,7 @@ class GuardianWordRequestControllerTest {
                         )
                 ));
 
-        mockMvc.perform(get("/api/guardian/word-requests")
+        mockMvc.perform(get("/api/v1/guardian/word-requests")
                         .principal(() -> "1")
                         .param("childId", "2"))
                 .andExpect(status().isOk())
@@ -68,6 +69,20 @@ class GuardianWordRequestControllerTest {
                 .andExpect(jsonPath("$.data[0].wordRequestId").value(31))
                 .andExpect(jsonPath("$.data[0].recognizedText").value("저끔"))
                 .andExpect(jsonPath("$.data[0].status").value("PENDING"));
+
+        verify(guardianWordRequestService).getWordRequests(1L, 2L);
+    }
+
+    @Test
+    void getWordRequestsReturnsEmptyList() throws Exception {
+        when(guardianWordRequestService.getWordRequests(1L, 2L))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/guardian/word-requests")
+                        .principal(() -> "1")
+                        .param("childId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
 
         verify(guardianWordRequestService).getWordRequests(1L, 2L);
     }
@@ -84,7 +99,7 @@ class GuardianWordRequestControllerTest {
                         resolvedAt
                 ));
 
-        mockMvc.perform(patch("/api/guardian/word-requests/31/resolve")
+        mockMvc.perform(patch("/api/v1/guardian/word-requests/31/resolve")
                         .principal(() -> "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -105,7 +120,7 @@ class GuardianWordRequestControllerTest {
 
     @Test
     void resolveWordRequestReturnsValidationErrorForBlankWord() throws Exception {
-        mockMvc.perform(patch("/api/guardian/word-requests/31/resolve")
+        mockMvc.perform(patch("/api/v1/guardian/word-requests/31/resolve")
                         .principal(() -> "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -124,7 +139,7 @@ class GuardianWordRequestControllerTest {
         when(guardianWordRequestService.resolveWordRequest(anyLong(), eq(31L), eq("적금")))
                 .thenThrow(new CustomException(GuardianErrorCode.ACCESS_FORBIDDEN));
 
-        mockMvc.perform(patch("/api/guardian/word-requests/31/resolve")
+        mockMvc.perform(patch("/api/v1/guardian/word-requests/31/resolve")
                         .principal(() -> "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -136,5 +151,53 @@ class GuardianWordRequestControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("GUARDIAN403"))
                 .andExpect(jsonPath("$.message").value("해당 아이의 정보에 접근할 권한이 없습니다."));
+    }
+
+    @Test
+    void resolveWordRequestReturns404WhenNotFound() throws Exception {
+        when(guardianWordRequestService.resolveWordRequest(1L, 31L, "적금"))
+                .thenThrow(new CustomException(
+                        GuardianErrorCode.WORD_REQUEST_NOT_FOUND
+                ));
+
+        mockMvc.perform(patch("/api/v1/guardian/word-requests/31/resolve")
+                        .principal(() -> "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"word": "적금"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code")
+                        .value("GUARDIAN404_WORD_REQUEST"));
+    }
+
+    @Test
+    void resolveWordRequestReturns409WhenAlreadyResolved() throws Exception {
+        when(guardianWordRequestService.resolveWordRequest(1L, 31L, "적금"))
+                .thenThrow(new CustomException(
+                        GuardianErrorCode.WORD_REQUEST_ALREADY_RESOLVED
+                ));
+
+        mockMvc.perform(patch("/api/v1/guardian/word-requests/31/resolve")
+                        .principal(() -> "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"word": "적금"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code")
+                        .value("GUARDIAN409_WORD_REQUEST_RESOLVED"));
+    }
+
+    @Test
+    void getWordRequestsReturns400ForInvalidChildId() throws Exception {
+        mockMvc.perform(get("/api/v1/guardian/word-requests")
+                        .principal(() -> "1")
+                        .param("childId", "abc"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(guardianWordRequestService);
     }
 }

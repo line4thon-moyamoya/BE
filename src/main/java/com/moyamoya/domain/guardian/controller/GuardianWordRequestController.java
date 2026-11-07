@@ -33,7 +33,7 @@ import java.util.List;
 @ParentModeRequired
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/guardian/word-requests")
+@RequestMapping("/api/v1/guardian/word-requests")
 public class GuardianWordRequestController {
 
     private final GuardianWordRequestService guardianWordRequestService;
