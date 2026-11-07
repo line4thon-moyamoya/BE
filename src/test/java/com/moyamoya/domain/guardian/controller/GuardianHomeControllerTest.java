@@ -1,12 +1,14 @@
 package com.moyamoya.domain.guardian.controller;
 
 import com.moyamoya.domain.guardian.dto.response.GuardianHomeResponse;
+import com.moyamoya.domain.guardian.dto.response.UpdateSelectedChildResponse;
 import com.moyamoya.domain.guardian.exception.GuardianErrorCode;
 import com.moyamoya.domain.guardian.service.GuardianHomeService;
 import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.global.exception.GlobalExceptionHandler;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -15,6 +17,7 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -153,5 +156,41 @@ class GuardianHomeControllerTest {
 
         verify(service).getHome(7L, 99L);
     }
-}
 
+    @Test
+    void updateSelectedChildReturnsUpdatedId() throws Exception {
+        when(service.updateSelectedChild(7L, 2L))
+                .thenReturn(new UpdateSelectedChildResponse(2L));
+
+        mvc.perform(patch("/api/v1/guardian/home/selected-child")
+                        .principal(() -> "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "childId": 2
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("최근 선택 아이가 변경되었습니다."))
+                .andExpect(jsonPath("$.data.selectedChildId").value(2));
+
+        verify(service).updateSelectedChild(7L, 2L);
+    }
+
+    @Test
+    void updateSelectedChildReturnsGlobal400WhenChildIdMissing() throws Exception {
+        mvc.perform(patch("/api/v1/guardian/home/selected-child")
+                        .principal(() -> "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GLOBAL400"));
+
+        verifyNoInteractions(service);
+    }
+}

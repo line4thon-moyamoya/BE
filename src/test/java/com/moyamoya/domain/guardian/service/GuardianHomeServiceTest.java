@@ -3,8 +3,10 @@ package com.moyamoya.domain.guardian.service;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.guardian.dto.response.GuardianHomeResponse;
+import com.moyamoya.domain.guardian.dto.response.UpdateSelectedChildResponse;
 import com.moyamoya.domain.guardian.exception.GuardianErrorCode;
 import com.moyamoya.domain.user.entity.User;
+import com.moyamoya.domain.user.repository.UserRepository;
 import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
@@ -32,6 +34,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class GuardianHomeServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private ChildRepository childRepository;
@@ -260,5 +265,18 @@ class GuardianHomeServiceTest {
         assertEquals(4L, result.questionCount());
         assertEquals(2L, result.unrecognizedCount());
     }
-}
 
+    @Test
+    void updateSelectedChildUpdatesUsersLastSelectedChild() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(childRepository.findById(2L)).thenReturn(Optional.of(child));
+        when(child.getUser()).thenReturn(user);
+        when(user.getId()).thenReturn(1L);
+
+        UpdateSelectedChildResponse result =
+                guardianHomeService.updateSelectedChild(1L, 2L);
+
+        assertEquals(2L, result.selectedChildId());
+        verify(user).updateLastSelectedChildId(2L);
+    }
+}

@@ -5,6 +5,9 @@ import com.moyamoya.domain.child.exception.ChildErrorCode;
 import com.moyamoya.domain.guardian.exception.GuardianErrorCode;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.guardian.dto.response.GuardianHomeResponse;
+import com.moyamoya.domain.guardian.dto.response.UpdateSelectedChildResponse;
+import com.moyamoya.domain.user.entity.User;
+import com.moyamoya.domain.user.repository.UserRepository;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
@@ -28,6 +31,7 @@ public class GuardianHomeService {
     private static final ZoneId KOREA_ZONE =
             ZoneId.of("Asia/Seoul");
 
+    private final UserRepository userRepository;
     private final ChildRepository childRepository;
     private final QuestionHistoryRepository questionHistoryRepository;
     private final WordRequestRepository wordRequestRepository;
@@ -144,5 +148,27 @@ public class GuardianHomeService {
                 previews
         );
     }
-}
 
+    @Transactional
+    public UpdateSelectedChildResponse updateSelectedChild(
+            Long userId,
+            Long childId
+    ) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new CustomException(GuardianErrorCode.ACCESS_FORBIDDEN)
+                );
+
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() ->
+                        new CustomException(ChildErrorCode.CHILD_NOT_FOUND)
+                );
+
+        if (!child.getUser().getId().equals(userId)) {
+            throw new CustomException(GuardianErrorCode.ACCESS_FORBIDDEN);
+        }
+
+        user.updateLastSelectedChildId(childId);
+        return new UpdateSelectedChildResponse(childId);
+    }
+}

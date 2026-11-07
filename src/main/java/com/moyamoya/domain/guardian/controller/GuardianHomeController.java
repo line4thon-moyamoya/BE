@@ -1,6 +1,8 @@
 package com.moyamoya.domain.guardian.controller;
 
+import com.moyamoya.domain.guardian.dto.request.UpdateSelectedChildRequest;
 import com.moyamoya.domain.guardian.dto.response.GuardianHomeResponse;
+import com.moyamoya.domain.guardian.dto.response.UpdateSelectedChildResponse;
 import com.moyamoya.domain.guardian.service.GuardianHomeService;
 import com.moyamoya.global.common.BaseResponse;
 import com.moyamoya.security.parentmode.ParentModeRequired;
@@ -16,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,7 +28,7 @@ import java.security.Principal;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/guardian/home")
-@Tag(name = "Guardian - Home", description = "보호자 홈 조회 API")
+@Tag(name = "Guardian", description = "보호자 홈 API")
 public class GuardianHomeController {
 
     private final GuardianHomeService guardianHomeService;
@@ -128,21 +131,36 @@ public class GuardianHomeController {
             }
             """;
 
+    private static final String UPDATE_SELECTED_CHILD_REQUEST_EXAMPLE = """
+            {
+              "childId": 2
+            }
+            """;
+
+    private static final String UPDATE_SELECTED_CHILD_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "최근 선택 아이가 변경되었습니다.",
+              "data": {
+                "selectedChildId": 2
+              }
+            }
+            """;
+
+    private static final String UPDATE_SELECTED_CHILD_INVALID_REQUEST_EXAMPLE = """
+            {
+              "success": false,
+              "code": "GLOBAL400",
+              "message": "childId: 아이 ID를 입력해 주세요.",
+              "data": null
+            }
+            """;
+
     @Operation(
             summary = "보호자 홈 조회",
             description = """
-                    로그인한 보호자의 아이 목록과 선택된 아이의
-                    이번 주 질문 활동 및 현재 미해결 요청을 조회합니다.
-
-                    childId 생략 시 첫 번째 아이를 자동 선택합니다.
-                    아이가 없으면 빈 응답을 반환합니다.
-
-                    questionCount: 이번 주 질문 기록 + 물어볼 단어 전체
-                    unrecognizedCount: 이번 주 생성된 미해결 요청
-                    pendingRequestCount: 전체 기간 미해결 요청
-                    pendingRequestPreview: 전체 기간 미해결 요청 최신 3개
-
-                    이번 주는 한국 시간 월요일 00:00부터 시작합니다.
+                    로그인한 보호자의 아이 목록과 선택된 아이의 이번 주 질문 활동 및 현재 미해결 요청을 조회합니다.
                     """,
             parameters = @Parameter(
                     name = "X-Parent-Mode-Token",
@@ -243,6 +261,93 @@ public class GuardianHomeController {
         return ResponseEntity.ok(
                 BaseResponse.success(
                         "보호자 홈 정보를 조회하였습니다.",
+                        response
+                )
+        );
+    }
+
+    @Operation(
+            summary = "최근 선택 아이 변경",
+            description = "보호자 홈에서 최근 선택한 아이를 변경합니다.",
+            parameters = @Parameter(
+                    name = "X-Parent-Mode-Token",
+                    description = "보호자 PIN 인증 후 발급받은 Parent Mode Token",
+                    required = true,
+                    in = ParameterIn.HEADER
+            ),
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "최근 선택 아이 변경 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = UPDATE_SELECTED_CHILD_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청 형식 오류",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(value = UPDATE_SELECTED_CHILD_INVALID_REQUEST_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "로그인 또는 보호자 모드 인증 실패",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(name = "로그인 인증 실패", value = UNAUTHORIZED_EXAMPLE),
+                                    @ExampleObject(name = "보호자 모드 인증 실패", value = PARENT_MODE_UNAUTHORIZED_EXAMPLE)
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "다른 보호자의 아이 선택",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(value = FORBIDDEN_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "아이 정보 없음",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(value = CHILD_NOT_FOUND_EXAMPLE)
+                    )
+            )
+    })
+    @ParentModeRequired
+    @PatchMapping("/selected-child")
+    public ResponseEntity<BaseResponse<UpdateSelectedChildResponse>> updateSelectedChild(
+            Principal principal,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UpdateSelectedChildRequest.class),
+                            examples = @ExampleObject(value = UPDATE_SELECTED_CHILD_REQUEST_EXAMPLE)
+                    )
+            )
+            @Valid @RequestBody UpdateSelectedChildRequest request
+    ) {
+        Long userId = Long.valueOf(principal.getName());
+
+        UpdateSelectedChildResponse response =
+                guardianHomeService.updateSelectedChild(
+                        userId,
+                        request.childId()
+                );
+
+        return ResponseEntity.ok(
+                BaseResponse.success(
+                        "최근 선택 아이가 변경되었습니다.",
                         response
                 )
         );
