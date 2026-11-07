@@ -49,7 +49,7 @@ public class RepetitionController {
             Principal principal,
             @Parameter(description = "아이 ID", example = "1") @PathVariable("childId") Long childId,
             @Parameter(description = "단어 ID", example = "1") @PathVariable("wordId") Long wordId,
-            @Parameter(description = "음성 파일 (wav, mp3, m4a, ogg, flac, aac, ac3)")
+            @Parameter(description = "음성 파일 (wav/mp3/webm/m4a(audio/mp4))")
             @RequestPart("audio") MultipartFile audio
     ) {
         return ResponseEntity.ok(BaseResponse.success("따라 말하기 결과를 확인했습니다.",
