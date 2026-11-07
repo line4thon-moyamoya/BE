@@ -35,7 +35,7 @@ public class ChildHomeService {
                 learnedWordRepository.countByChild_Id(
                         childId
                 )
-        );
+        ); // 노래 쪽에서 소비/정산 로직 구현되면 수정 예정(일단 임시)
 
         return new ChildHomeResponse(
                 child.getId(),
