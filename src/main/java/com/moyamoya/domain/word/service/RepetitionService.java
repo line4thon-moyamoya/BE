@@ -45,10 +45,10 @@ public class RepetitionService {
 
         String recognizedText = transcribe(audio);
         var evaluation = evaluationService.evaluate(recognizedText, word.getWord(), child.getAgeGroup());
-        // STT 호출이 끝난 뒤 별도 트랜잭션에서 카드 저장 및 소유권 재확인
         var acquisition = acquisitionService.acquireCard(userId, childId, wordId, evaluation.isCorrect());
         return new RepetitionResponse(wordId, acquisition.learnedWordId(),
                 evaluation.isCorrect(), acquisition.isNewAcquisition(),
+                acquisition.couponCount(), acquisition.songId(),
                 dialogueService.repetition(word.getWord(), evaluation.isCorrect()),
                 dialogueService.acquisition(acquisition.isNewAcquisition()));
     }

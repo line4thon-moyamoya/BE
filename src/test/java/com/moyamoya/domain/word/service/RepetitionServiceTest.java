@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.service.SongRegistrationService;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.service.PronunciationSimilarity;
@@ -34,6 +36,7 @@ class RepetitionServiceTest {
     @Mock private ChildRepository children;
     @Mock private WordRepository words;
     @Mock private LearnedWordRepository cards;
+    @Mock private SongRegistrationService songs;
     @Mock private SttService stt;
     @Mock private MoyaTtsService tts;
     @Mock private QuestionDataLoader loader;
@@ -46,7 +49,8 @@ class RepetitionServiceTest {
     void setUp() {
         service = new RepetitionService(children, words, stt,
                 new RepetitionEvaluationService(new PronunciationSimilarity(), loader, words),
-                new WordCardAcquisitionService(children, words, cards), new RepetitionDialogueService(tts));
+                new WordCardAcquisitionService(children, words, cards, songs), new RepetitionDialogueService(tts));
+        lenient().when(songs.register(any())).thenReturn(new SongRegistrationResult(0, 12L));
     }
 
     private void ownedWord() {
@@ -87,6 +91,8 @@ class RepetitionServiceTest {
         assertThat(result.learnedWordId()).isEqualTo(35L);
         assertThat(result.isCorrect()).isEqualTo(correct);
         assertThat(result.isNewAcquisition()).isTrue();
+        assertThat(result.couponCount()).isZero();
+        assertThat(result.songId()).isEqualTo(12L);
         assertThat(result.repetitionDialogue().text()).isEqualTo(correct
                 ? "우와! 적금! 잘했어!" : "적금! 적금! 다음에 또 해보자!");
         assertThat(result.acquisitionDialogue().text()).isEqualTo("새로운 단어 카드를 받았어! 수첩에서 확인해 봐!");
@@ -110,6 +116,8 @@ class RepetitionServiceTest {
 
         assertThat(result.isCorrect()).isTrue();
         assertThat(result.isNewAcquisition()).isFalse();
+        assertThat(result.songId()).isNull();
+        verifyNoInteractions(songs);
         assertThat(card.isNew()).isFalse();
         assertThat(card.isStickerEarned()).isTrue();
         verify(cards, never()).save(any());

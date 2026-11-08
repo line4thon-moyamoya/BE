@@ -33,7 +33,10 @@ public class RepetitionController {
                     + "실패·무응답도 신규 카드를 저장하며, 성공 시 스티커를 반영합니다. "
                     + "카드 처리 후 결과·획득 안내 대사와 Base64 WAV 음성(audio/wav)을 반환합니다. "
                     + "TTS 실패 시 대사와 카드 처리 결과는 유지하고 음성 두 필드는 null로 반환합니다. "
-                    + "STT 및 안내별 TTS 외부 호출 비용이 발생합니다. 쿠폰·노래 연동은 후속 작업입니다.",
+                    + "신규 카드 획득 후 미사용 카드가 5장 이상이면 획득 순서대로 5장을 노래에 배정합니다. "
+                    + "남은 couponCount와 이번에 등록한 songId(미등록 시 null)를 반환합니다. "
+                    + "노래는 GENERATING으로 등록하며 음원 합성은 아직 연결하지 않습니다. "
+                    + "STT 및 안내별 TTS 외부 호출 비용이 발생합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "판정 및 카드 처리 완료"),

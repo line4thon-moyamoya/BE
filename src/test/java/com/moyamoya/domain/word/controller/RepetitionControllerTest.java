@@ -28,18 +28,29 @@ class RepetitionControllerTest {
 
     @Test
     void multipartUsesPrincipalAndReturnsExactBooleanFieldNames() throws Exception {
-        when(service.repeat(eq(7L), eq(2L), eq(1L), any())).thenReturn(new RepetitionResponse(1L, 35L, true, true,
+        when(service.repeat(eq(7L), eq(2L), eq(1L), any())).thenReturn(new RepetitionResponse(1L, 35L, true, true, 0, 12L,
                 new DialogueResponse("우와! 적금! 잘했어!", "AQ==", "audio/wav"),
                 new DialogueResponse("새로운 단어 카드를 받았어! 수첩에서 확인해 봐!", null, null)));
         mvc.perform(multipart(PATH, 2, 1).file(audio).principal(() -> "7"))
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"success":true,"code":200,"message":"따라 말하기 결과를 확인했습니다.",
-                         "data":{"wordId":1,"learnedWordId":35,"isCorrect":true,"isNewAcquisition":true,
+                         "data":{"wordId":1,"learnedWordId":35,"isCorrect":true,"isNewAcquisition":true,"couponCount":0,"songId":12,
                          "repetitionDialogue":{"text":"우와! 적금! 잘했어!","audioBase64":"AQ==","audioContentType":"audio/wav"},
                          "acquisitionDialogue":{"text":"새로운 단어 카드를 받았어! 수첩에서 확인해 봐!","audioBase64":null,"audioContentType":null}}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
         verify(service).repeat(7L, 2L, 1L, audio);
+    }
+
+    @Test
+    void returnsNullSongIdWhenNoSongWasRegistered() throws Exception {
+        when(service.repeat(eq(7L), eq(2L), eq(1L), any()))
+                .thenReturn(new RepetitionResponse(1L, 35L, false, true, 3, null, null, null));
+
+        mvc.perform(multipart(PATH, 2, 1).file(audio).principal(() -> "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.couponCount").value(3))
+                .andExpect(jsonPath("$.data.songId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test

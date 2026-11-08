@@ -27,9 +27,7 @@ public class SongCouponController {
     private final SongCouponService songCouponService;
 
     @Operation(summary = "노래 쿠폰 현황 조회",
-            description = "로그인한 보호자의 아이가 보유한 미사용 카드 수를 조회합니다. "
-                    + "노래에 연결된 카드는 생성 상태에 관계없이 제외합니다. "
-                    + "5장 사용 처리 연동 전에는 5 이상을 반환할 수 있으며, 조회로 카드를 사용하지 않습니다.",
+            description = "해당 아이가 현재 보유한 노래 쿠폰 수를 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "쿠폰 조회 성공",

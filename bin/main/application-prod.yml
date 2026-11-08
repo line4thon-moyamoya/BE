@@ -1,0 +1,35 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+server:
+  forward-headers-strategy: framework
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+logging:
+  level:
+    root: info
+    com.moyamoya: info
+
+jwt:
+  access-token-expiration-ms: ${ACCESS_TOKEN_TTL}
+  refresh-token-expiration-ms: ${REFRESH_TOKEN_TTL}
+  parent-mode-token-expiration-ms: ${PARENT_MODE_TOKEN_TTL:600000}
+
+parent-pin:
+  max-failed-attempts: ${PARENT_PIN_MAX_FAILED_ATTEMPTS:5}
+  failure-window-ms: ${PARENT_PIN_FAILURE_WINDOW_MS:300000}
+  block-duration-ms: ${PARENT_PIN_BLOCK_DURATION_MS:300000}
+
