@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
 @RestControllerAdvice
@@ -40,6 +41,13 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException exception
     ) {
         return createErrorResponse(GlobalErrorCode.MESSAGE_NOT_READABLE);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<BaseResponse<Void>> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException exception
+    ) {
+        return createErrorResponse(GlobalErrorCode.INVALID_INPUT);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -74,4 +82,3 @@ public class GlobalExceptionHandler {
         return fieldError.getField() + ": " + fieldError.getDefaultMessage();
     }
 }
-

@@ -21,6 +21,12 @@ public enum ChildErrorCode implements BaseErrorCode {
             "CHILD400_INVALID_AGE",
             "올바른 나이 구간을 선택해 주세요.",
             HttpStatus.BAD_REQUEST
+    ),
+
+    HOME_ACCESS_FORBIDDEN(
+        "CHILD403_HOME",
+                "해당 아이의 홈 정보를 조회할 권한이 없습니다.",
+        HttpStatus.FORBIDDEN
     );
 
     private final String code;

@@ -16,6 +16,8 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.moyamoya.domain.child.entity.AgeGroup;
@@ -28,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QuestionServiceTest {
@@ -42,6 +46,7 @@ class QuestionServiceTest {
     private WordRepository wordRepository;
     private ChildRepository childRepository;
     private UserRepository userRepository;
+    private QuestionAudioTempService audioTempService;
     private QuestionService questionService;
 
     @BeforeEach
@@ -56,6 +61,7 @@ class QuestionServiceTest {
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
         userRepository = mock(UserRepository.class);
+        audioTempService = mock(QuestionAudioTempService.class);
 
         questionService = new QuestionService(
                 targetExtractor,
@@ -67,7 +73,8 @@ class QuestionServiceTest {
                 sessionStore,
                 wordRepository,
                 childRepository,
-                userRepository
+                userRepository,
+                audioTempService
         );
 
         when(moyaTtsService.synthesize(any()))
@@ -118,6 +125,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().wordAudioUrl())
                 .isEqualTo("https://audio.example/word.wav");
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
+        assertThat(response.dialogue()).isNotNull();
+        assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
     }
 
     @Test
@@ -171,6 +180,8 @@ class QuestionServiceTest {
         assertThat(response.status()).isEqualTo("CANDIDATES_FOUND");
         assertThat(response.candidates()).hasSize(1);
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
+        assertThat(response.dialogue()).isNotNull();
+        assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
     }
 
     @Test
@@ -266,6 +277,86 @@ class QuestionServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void findSecondCandidatesKeepsSessionStateWhenDialogueTtsFails() {
+        QuestionSession session = QuestionSession.create(1L, "엄마 저끔이 뭐야?", null);
+        session.setExtractionResult("저끔", List.of("저끔"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "CURATED:적금",
+                null,
+                "적금",
+                WordSourceType.CURATED,
+                0.9,
+                0.0,
+                0.9,
+                "정의",
+                null,
+                null,
+                null
+        )));
+
+        List<WordCandidate> secondCandidates = List.of(new WordCandidate(
+                "CURATED:연금",
+                null,
+                "연금",
+                WordSourceType.CURATED,
+                0.8,
+                0.6,
+                0.75,
+                "정의2",
+                null,
+                null,
+                null
+        ));
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        stubChildOwnership(1L, 1L);
+        when(rankingService.rankSecond(
+                List.of("저끔"),
+                "엄마 저끔이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of("CURATED:적금")
+        )).thenReturn(secondCandidates);
+        when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+        when(moyaTtsService.synthesize(any()))
+                .thenThrow(new IllegalStateException("tts failed"));
+
+        assertThatThrownBy(() -> questionService.findSecondCandidates(
+                1L,
+                session.getSessionId().toString(),
+                HeardFrom.PARENTS
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+
+        assertThat(session.getStatus()).isEqualTo(com.moyamoya.domain.question.session.QuestionSessionStatus.FIRST_CANDIDATES_READY);
+        verify(sessionStore, never()).save(session);
+    }
+
+    @Test
+    void analyzeAudioThrowsAudioTempSaveFailedWhenTempSaveFails() {
+        MultipartFile audio = new MockMultipartFile(
+                "audio",
+                "test.wav",
+                "audio/wav",
+                new byte[]{
+                        'R', 'I', 'F', 'F',
+                        0x24, 0x00, 0x00, 0x00,
+                        'W', 'A', 'V', 'E',
+                        'f', 'm', 't', ' '
+                }
+        );
+        when(audioTempService.save(audio))
+                .thenThrow(new IllegalStateException("temp save failed"));
+        stubChildOwnership(1L, 1L);
+
+        assertThatThrownBy(() -> questionService.analyzeAudio(1L, 1L, audio))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.AUDIO_TEMP_SAVE_FAILED);
     }
 
     private void stubChildOwnership(Long userId, Long childId) {

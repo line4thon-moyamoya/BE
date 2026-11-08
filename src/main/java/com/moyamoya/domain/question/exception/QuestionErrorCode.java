@@ -73,6 +73,18 @@ public enum QuestionErrorCode implements BaseErrorCode {
             "QUESTION502_TTS_FAILED",
             "음성 생성 서비스에 문제가 발생했습니다.",
             HttpStatus.BAD_GATEWAY
+    ),
+
+    WORD_REQUEST_SAVE_FAILED(
+            "QUESTION500_WORD_REQUEST_SAVE_FAILED",
+            "물어볼 단어를 저장하는 중 문제가 발생했습니다.",
+            HttpStatus.INTERNAL_SERVER_ERROR
+    ),
+
+    AUDIO_TEMP_SAVE_FAILED(
+            "QUESTION500_AUDIO_TEMP_SAVE_FAILED",
+            "원본 음성 파일을 처리하는 중 문제가 발생했습니다.",
+            HttpStatus.INTERNAL_SERVER_ERROR
     );
 
     private final String code;
