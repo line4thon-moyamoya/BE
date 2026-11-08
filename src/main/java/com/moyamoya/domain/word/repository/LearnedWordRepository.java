@@ -1,14 +1,23 @@
 package com.moyamoya.domain.word.repository;
 
 import com.moyamoya.domain.word.entity.LearnedWord;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LearnedWordRepository extends JpaRepository<LearnedWord, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<LearnedWord> findByChild_IdAndWord_Id(Long childId, Long wordId);
+
+    @EntityGraph(attributePaths = "word")
     Optional<LearnedWord> findByIdAndChild_Id(Long learnedWordId, Long childId);
+
+    long countByChild_Id(Long childId);
 
     @Query("""
             select lw from LearnedWord lw

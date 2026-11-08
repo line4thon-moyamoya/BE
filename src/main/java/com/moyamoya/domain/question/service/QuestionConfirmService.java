@@ -18,12 +18,14 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.global.s3.S3AudioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Base64;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class QuestionConfirmService {
@@ -34,8 +36,8 @@ public class QuestionConfirmService {
     private final QuestionHistoryRepository questionHistoryRepository;
     private final CandidateTtsService candidateTtsService;
     private final S3AudioService s3AudioService;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public ConfirmWordResponse confirmWord(
             Long userId,
             String sessionId,
@@ -66,6 +68,9 @@ public class QuestionConfirmService {
         }
 
         synchronized (session) {
+            if (!sessionStore.isCurrent(session)) {
+                throw new CustomException(QuestionErrorCode.SESSION_NOT_FOUND);
+            }
 
             if (session.getStatus() != QuestionSessionStatus.FIRST_CANDIDATES_READY
                     && session.getStatus() != QuestionSessionStatus.SECOND_CANDIDATES_READY) {
@@ -80,64 +85,78 @@ public class QuestionConfirmService {
                             QuestionErrorCode.INVALID_CANDIDATE
                     ));
 
-            // 기존 단어 재사용 또는 신규 외부 단어 생성
-            Word word = wordRepository.findByWord(candidate.word())
-                    .orElseGet(() -> createExternalWord(candidate, child));
+            ConfirmWordResponse response = transactionTemplate.execute(status -> {
+                // 기존 단어 재사용 또는 신규 외부 단어 생성
+                Word word = wordRepository.findByWord(candidate.word())
+                        .orElseGet(() -> createExternalWord(candidate, child));
 
-            // 음성이 없는 경우 S3 저장
-            // 기존 단어는 이미 저장된 음성 재사용
-            try {
-                candidateTtsService.ensureStoredAudio(
+                // 음성이 없는 경우 S3 저장
+                // 기존 단어는 이미 저장된 음성 재사용
+                try {
+                    candidateTtsService.ensureStoredAudio(
+                            word,
+                            child.getAgeGroup()
+                    );
+                } catch (IllegalArgumentException | IllegalStateException e) {
+                    throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                }
+
+                // 질문 기록 저장 (기본/외부 단어 공통)
+                QuestionHistory history = QuestionHistory.create(
+                        child,
                         word,
-                        child.getAgeGroup()
+                        session.getTargetPronunciation()
                 );
-            } catch (IllegalArgumentException | IllegalStateException e) {
-                throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                questionHistoryRepository.save(history);
+
+                boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
+                String descriptionKey = age3To4
+                        ? word.getDescriptionAudioAge3To4Url()
+                        : word.getDescriptionAudioAge5Url();
+
+                String wordAudioUrl;
+                String descriptionAudioUrl;
+                try {
+                    wordAudioUrl = candidateTtsService.resolveAudioUrl(
+                            word.getWordAudioUrl()
+                    );
+
+                    descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
+                            descriptionKey
+                    );
+                } catch (RuntimeException exception) {
+                    throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                }
+
+                return new ConfirmWordResponse(
+                        "CONFIRMED",
+                        word.getId(),
+                        word.getWord(),
+                        candidate.definition(),
+                        word.getImageUrl(),
+                        wordAudioUrl,
+                        descriptionAudioUrl,
+                        "WORD_LEARNING"
+                );
+            });
+
+            if (response == null) {
+                throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
             }
 
-            // 질문 기록 저장 (기본/외부 단어 공통)
-            QuestionHistory history = QuestionHistory.create(
-                    child,
-                    word,
-                    session.getTargetPronunciation()
-            );
-
-            questionHistoryRepository.save(history);
-
-            boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
-
-            String descriptionKey = age3To4
-                    ? word.getDescriptionAudioAge3To4Url()
-                    : word.getDescriptionAudioAge5Url();
-
-            String wordAudioUrl;
-            String descriptionAudioUrl;
-            try {
-                wordAudioUrl = candidateTtsService.resolveAudioUrl(
-                        word.getWordAudioUrl()
-                );
-
-                descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
-                        descriptionKey
-                );
-            } catch (RuntimeException exception) {
-                throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
-            }
-
-            // 세션 확정
+            // DB 커밋 성공 후 세션 확정
             session.confirm();
             sessionStore.save(session);
 
-            return new ConfirmWordResponse(
-                    "CONFIRMED",
-                    word.getId(),
-                    word.getWord(),
-                    candidate.definition(),
-                    word.getImageUrl(),
-                    wordAudioUrl,
-                    descriptionAudioUrl,
-                    "WORD_LEARNING"
-            );
+            // 임시 파일 삭제 실패는 로그만 남기고 확정 성공 처리
+            try {
+                sessionStore.deleteTempAudio(session);
+            } catch (RuntimeException e) {
+                log.warn("단어 확정 후 임시 음성 삭제 실패. sessionId={}",
+                        session.getSessionId(), e);
+            }
+
+            return response;
         }
     }
 

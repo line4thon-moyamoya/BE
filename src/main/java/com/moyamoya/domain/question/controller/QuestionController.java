@@ -7,6 +7,8 @@ import com.moyamoya.domain.question.dto.response.QuestionCandidateResponse;
 import com.moyamoya.domain.question.dto.response.SecondCandidateResponse;
 import com.moyamoya.domain.question.service.QuestionConfirmService;
 import com.moyamoya.domain.question.service.QuestionService;
+import com.moyamoya.domain.question.dto.response.WordRequestSaveResponse;
+import com.moyamoya.domain.question.service.WordRequestSaveService;
 import com.moyamoya.global.common.BaseResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -80,7 +82,8 @@ public class QuestionController {
                 "dialogue": {
                   "text": "적금? 예금? 어떤 거야?",
                   "audioUrl": null,
-                  "audioBase64": "UklGRiQAAABXQVZF..."
+                  "audioBase64": "UklGRiQAAABXQVZF...",
+                  "audioContentType": "audio/wav"
                 },
                 "nextStep": "CANDIDATE_SELECTION"
               }
@@ -182,6 +185,12 @@ public class QuestionController {
                     "descriptionAudioBase64": null
                   }
                 ],
+                "dialogue": {
+                  "text": "연금 말하는 거야?",
+                  "audioUrl": null,
+                  "audioBase64": "UklGRiQAAABXQVZF...",
+                  "audioContentType": "audio/wav"
+                },
                 "nextStep": "FINAL_CANDIDATE_SELECTION"
               }
             }
@@ -196,6 +205,7 @@ public class QuestionController {
                 "status": "NO_CANDIDATE",
                 "candidateCount": 0,
                 "candidates": [],
+                "dialogue": null,
                 "nextStep": "WORD_REQUEST"
               }
             }
@@ -310,9 +320,70 @@ public class QuestionController {
               "data": null
             }
             """;
+    private static final String WORD_REQUEST_SAVE_SUCCESS_EXAMPLE = """
+            {
+              "success": true,
+              "code": 200,
+              "message": "물어볼 단어로 저장되었습니다.",
+              "data": {
+                "wordRequestId": 15,
+                "status": "PENDING",
+                "nextStep": "WORD_REQUEST_SAVED"
+              }
+            }
+            """;
+    private static final String WORD_REQUEST_INVALID_SESSION_ID_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION400_INVALID_SESSION",
+              "message": "sessionId 형식이 올바르지 않습니다.",
+              "data": null
+            }
+            """;
+    private static final String WORD_REQUEST_UNAUTHORIZED_EXAMPLE = """
+            {
+              "success": false,
+              "code": "AUTH401",
+              "message": "인증이 필요합니다.",
+              "data": null
+            }
+            """;
+    private static final String WORD_REQUEST_FORBIDDEN_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION403",
+              "message": "해당 질문 정보에 접근할 권한이 없습니다.",
+              "data": null
+            }
+            """;
+    private static final String WORD_REQUEST_NOT_FOUND_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION404",
+              "message": "존재하지 않거나 만료된 질문입니다.",
+              "data": null
+            }
+            """;
+    private static final String WORD_REQUEST_CONFLICT_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION409",
+              "message": "현재 질문 단계에서는 요청을 처리할 수 없습니다.",
+              "data": null
+            }
+            """;
+    private static final String WORD_REQUEST_SAVE_FAILED_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION500_WORD_REQUEST_SAVE_FAILED",
+              "message": "물어볼 단어를 저장하는 중 문제가 발생했습니다.",
+              "data": null
+            }
+            """;
 
     private final QuestionService questionService;
     private final QuestionConfirmService questionConfirmService;
+    private final WordRequestSaveService wordRequestSaveService;
 
     @Operation(
             summary = "음성 질문 분석 및 1차 후보 탐색",
@@ -589,6 +660,100 @@ public class QuestionController {
 
         return ResponseEntity.ok(
                 BaseResponse.success("단어를 확정했습니다.", response)
+        );
+    }
+
+    @Operation(
+            summary = "물어볼 단어 저장",
+            description = """
+                    2차 단어 후보를 모두 거절한 경우 호출합니다.
+                    원본 음성을 S3에 업로드하고,
+                    조사 제거 여부까지 판단한 표현을
+                    물어볼 단어로 저장합니다.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "물어볼 단어 저장 성공",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_SAVE_SUCCESS_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 sessionId 또는 요청",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_INVALID_SESSION_ID_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "인증이 필요합니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_UNAUTHORIZED_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "해당 질문에 접근할 권한이 없습니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_FORBIDDEN_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "질문 세션이 없거나 만료되었습니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_NOT_FOUND_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "잘못된 질문 단계 또는 중복 저장",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_CONFLICT_EXAMPLE)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "물어볼 단어 저장 실패",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(value = WORD_REQUEST_SAVE_FAILED_EXAMPLE)
+                    )
+            )
+    })
+    @PostMapping("/{sessionId}/word-request")
+    public ResponseEntity<BaseResponse<WordRequestSaveResponse>>
+    saveWordRequest(
+            Principal principal,
+            @PathVariable String sessionId
+    ) {
+        Long userId = Long.valueOf(principal.getName());
+
+        WordRequestSaveResponse response =
+                wordRequestSaveService.save(userId, sessionId);
+
+        return ResponseEntity.ok(
+                BaseResponse.success(
+                        "물어볼 단어로 저장되었습니다.",
+                        response
+                )
         );
     }
 }

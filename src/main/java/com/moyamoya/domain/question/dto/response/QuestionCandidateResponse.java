@@ -21,7 +21,8 @@ public record QuestionCandidateResponse(
     public record Dialogue(
             String text,
             String audioUrl,
-            String audioBase64
+            String audioBase64,
+            String audioContentType
     ) {
     }
 
@@ -59,7 +60,12 @@ public record QuestionCandidateResponse(
                 session.getTargetPronunciation(),
                 candidates.size(),
                 candidates,
-                found ? new Dialogue(buildDialogue(candidates), null, dialogueAudioBase64) : null,
+                found ? new Dialogue(
+                        buildDialogue(candidates),
+                        null,
+                        dialogueAudioBase64,
+                        hasText(dialogueAudioBase64) ? "audio/wav" : null
+                ) : null,
                 found ? "CANDIDATE_SELECTION" : "ASK_HEARD_FROM"
         );
     }
@@ -82,5 +88,9 @@ public record QuestionCandidateResponse(
         );
 
         return words + "? 어떤 거야?";
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

@@ -17,6 +17,8 @@ import com.moyamoya.global.s3.S3AudioService;
 import com.moyamoya.domain.question.session.QuestionSessionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,7 @@ class QuestionConfirmServiceTest {
     private QuestionHistoryRepository questionHistoryRepository;
     private CandidateTtsService candidateTtsService;
     private S3AudioService s3AudioService;
+    private TransactionTemplate transactionTemplate;
 
     private QuestionConfirmService questionConfirmService;
 
@@ -46,6 +49,12 @@ class QuestionConfirmServiceTest {
         questionHistoryRepository = mock(QuestionHistoryRepository.class);
         candidateTtsService = mock(CandidateTtsService.class);
         s3AudioService = mock(S3AudioService.class);
+        transactionTemplate = mock(TransactionTemplate.class);
+
+        when(transactionTemplate.execute(any()))
+                .thenAnswer(invocation ->
+                        ((TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null)
+                );
 
         questionConfirmService = new QuestionConfirmService(
                 sessionStore,
@@ -53,7 +62,8 @@ class QuestionConfirmServiceTest {
                 wordRepository,
                 questionHistoryRepository,
                 candidateTtsService,
-                s3AudioService
+                s3AudioService,
+                transactionTemplate
         );
     }
 
@@ -76,6 +86,7 @@ class QuestionConfirmServiceTest {
         )));
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
         stubChildOwnership(1L, 1L);
 
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
@@ -110,6 +121,7 @@ class QuestionConfirmServiceTest {
         when(existingWord.getWord()).thenReturn("적금");
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
         stubChildOwnership(1L, 1L);
         when(wordRepository.findByWord("적금")).thenReturn(Optional.of(existingWord));
         org.mockito.Mockito.doThrow(new IllegalStateException("tts failed"))
@@ -149,6 +161,7 @@ class QuestionConfirmServiceTest {
 
         when(sessionStore.find(session.getSessionId()))
                 .thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
 
         stubChildOwnership(1L, 1L);
 
