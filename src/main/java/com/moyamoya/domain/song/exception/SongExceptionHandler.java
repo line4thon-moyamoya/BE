@@ -15,7 +15,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class SongExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<BaseResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
-        SongErrorCode error = SongErrorCode.INVALID_CHILD_ID;
+        SongErrorCode error = "songId".equals(exception.getName())
+                ? SongErrorCode.INVALID_SONG_ID : SongErrorCode.INVALID_CHILD_ID;
         return ResponseEntity.status(error.getHttpStatus())
                 .body(BaseResponse.error(error.getCode(), error.getMessage()));
     }
