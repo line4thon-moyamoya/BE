@@ -56,9 +56,7 @@ public class WordController {
     private final WordService wordService;
 
     @Operation(summary = "아이 연령별 단어 설명 조회",
-            description = "로그인한 보호자의 아이 연령에 맞는 설명을 조회하며, 없으면 기본 정의를 사용합니다. "
-                    + "음성은 재사용하고 누락된 경우에만 TTS 생성·S3 저장합니다. 첫 생성에는 시간과 비용이 발생합니다. "
-                    + "WAV 재생 URL은 발급 후 30분 유효하며, 설명과 기본 정의가 모두 없으면 음성은 null입니다.",
+            description = "아이 연령에 맞는 단어 설명과 설명 음성 URL을 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "단어 설명 조회 성공",
