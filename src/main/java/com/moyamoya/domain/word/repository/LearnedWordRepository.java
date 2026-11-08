@@ -11,6 +11,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LearnedWordRepository extends JpaRepository<LearnedWord, Long> {
+    @Query("""
+            select count(lw) from LearnedWord lw
+            where lw.child.id = :childId
+              and not exists (
+                  select sw.id from SongWord sw where sw.learnedWord = lw
+              )
+            """)
+    long countUnusedForSongByChildId(@Param("childId") Long childId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<LearnedWord> findByChild_IdAndWord_Id(Long childId, Long wordId);
 
