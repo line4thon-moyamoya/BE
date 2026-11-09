@@ -1,6 +1,7 @@
 package com.moyamoya.domain.song.service;
 
 import com.moyamoya.domain.song.entity.SongStatus;
+import com.moyamoya.domain.song.dto.response.SongMixResponse;
 import com.moyamoya.domain.song.repository.SongRepository;
 import com.moyamoya.domain.song.repository.SongWordRepository;
 import com.moyamoya.global.s3.S3AudioService;
@@ -42,7 +43,7 @@ public class SongGenerationService {
             if (words == null) {
                 return;
             }
-            var result = mixingService.mix(words);
+            var result = mixWithRetry(songId, words);
             audioKey = result.audioKey();
             String uploadedKey = audioKey;
             boolean ready = Boolean.TRUE.equals(writeTransaction.execute(status -> {
@@ -61,6 +62,24 @@ public class SongGenerationService {
             if (markFailed(songId) && audioKey != null) {
                 deleteUnusedAudio(audioKey);
             }
+        }
+    }
+
+    private SongMixResponse mixWithRetry(Long songId, List<String> words) {
+        try {
+            return mixingService.mix(words);
+        } catch (RuntimeException exception) {
+            if (!SongGenerationRetryPolicy.isTransient(exception) || Thread.currentThread().isInterrupted()) {
+                throw exception;
+            }
+            log.warn("일시적인 노래 생성 오류로 1회 재시도합니다. songId={}", songId, exception);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("노래 생성 재시도 대기가 중단됐습니다.", interrupted);
+            }
+            return mixingService.mix(words);
         }
     }
 

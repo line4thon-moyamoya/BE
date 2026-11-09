@@ -73,6 +73,48 @@ class SongGenerationServiceTest {
     }
 
     @Test
+    void transientFailureRetriesOnceWhileGeneratingAndThenSucceeds() {
+        generatingSong();
+        assignedWords();
+        when(mixing.mix(texts)).thenThrow(new IllegalStateException("timeout", new java.net.SocketTimeoutException()))
+                .thenAnswer(invocation -> {
+                    assertThat(song.getStatus()).isEqualTo(SongStatus.GENERATING);
+                    assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+                    return new SongMixResponse(KEY, "url");
+                });
+        service.generate(12L);
+        verify(mixing, times(2)).mix(texts);
+        assertThat(song.getStatus()).isEqualTo(SongStatus.READY);
+        verifyNoInteractions(audio);
+    }
+
+    @Test
+    void secondTransientFailureMarksFailedWithoutThirdAttempt() {
+        generatingSong();
+        assignedWords();
+        when(mixing.mix(texts)).thenThrow(new IllegalStateException("timeout", new java.net.SocketTimeoutException()));
+        service.generate(12L);
+        verify(mixing, times(2)).mix(texts);
+        assertThat(song.getStatus()).isEqualTo(SongStatus.FAILED);
+        assertThat(song.getAudioUrl()).isNull();
+    }
+
+    @Test
+    void interruptedWorkerDoesNotRetry() {
+        generatingSong();
+        assignedWords();
+        when(mixing.mix(texts)).thenThrow(new IllegalStateException("timeout", new java.net.SocketTimeoutException()));
+        Thread.currentThread().interrupt();
+        try {
+            service.generate(12L);
+            verify(mixing).mix(texts);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    @Test
     void synthesisFailureMarksSongFailedWithoutChangingCards() {
         generatingSong();
         assignedWords();
@@ -80,6 +122,7 @@ class SongGenerationServiceTest {
         service.generate(12L);
         assertThat(song.getStatus()).isEqualTo(SongStatus.FAILED);
         assertThat(song.getAudioUrl()).isNull();
+        verify(mixing).mix(texts);
         verifyNoInteractions(audio);
         verify(words, never()).deleteAll(anyList());
     }
