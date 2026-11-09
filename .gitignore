@@ -19,7 +19,6 @@ Thumbs.db
 
 __pycache__/
 *.pyc
-local-song-output/
 secrets/
 google-tts.json
 moyamoya-tts-*.json
