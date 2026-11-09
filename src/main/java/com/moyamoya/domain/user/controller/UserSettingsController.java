@@ -16,16 +16,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "User Settings", description = "User settings API")
+@Tag(name = "사용자 설정", description = "사용자 설정 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/users/me/settings")
 public class UserSettingsController {
     private final UserSettingsService userSettingsService;
 
-    @Operation(summary = "Get user settings", description = "Returns child profiles and voice consent status; children may be empty.",
+    @Operation(summary = "설정 화면 조회", description = "설정 화면에 필요한 전체 아이 프로필 목록과 음성 동의 상태를 조회합니다. 등록된 아이가 없으면 빈 배열을 반환합니다.",
             security = @SecurityRequirement(name = "bearerAuth"),
-            parameters = @Parameter(name = "X-Parent-Mode-Token", required = true, in = ParameterIn.HEADER))
+            parameters = @Parameter(name = "X-Parent-Mode-Token", description = "보호자 PIN 인증으로 발급받은 보호자 모드 토큰", required = true, in = ParameterIn.HEADER))
     @ParentModeRequired
     @GetMapping
     public ResponseEntity<BaseResponse<UserSettingsResponse>> getSettings(Principal principal) {
