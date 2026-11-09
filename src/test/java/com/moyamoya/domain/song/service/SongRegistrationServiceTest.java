@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.song.entity.Song;
+import com.moyamoya.domain.song.model.SongGenerationRequested;
+import org.springframework.context.ApplicationEventPublisher;
 import com.moyamoya.domain.song.entity.SongStatus;
 import com.moyamoya.domain.song.entity.SongWord;
 import com.moyamoya.domain.song.repository.SongRepository;
@@ -32,12 +34,13 @@ class SongRegistrationServiceTest {
     @Mock private LearnedWordRepository cards;
     @Mock private SongRepository songs;
     @Mock private SongWordRepository songWords;
+    @Mock private ApplicationEventPublisher events;
     private SongRegistrationService service;
     private Child child;
 
     @BeforeEach
     void setUp() {
-        service = new SongRegistrationService(cards, songs, songWords);
+        service = new SongRegistrationService(cards, songs, songWords, events);
         child = Child.create(mock(User.class), "지우", AgeGroup.AGE_5);
         ReflectionTestUtils.setField(child, "id", 2L);
     }
@@ -51,7 +54,7 @@ class SongRegistrationServiceTest {
 
         assertThat(result.couponCount()).isEqualTo(count);
         assertThat(result.songId()).isNull();
-        verifyNoInteractions(songs, songWords);
+        verifyNoInteractions(songs, songWords, events);
         verify(cards, never()).findUnusedForSongByChildId(any(), any());
     }
 
@@ -76,6 +79,9 @@ class SongRegistrationServiceTest {
 
         assertThat(result.couponCount()).isEqualTo(count - 5);
         assertThat(result.songId()).isEqualTo(12L);
+        var order = inOrder(songWords, events);
+        order.verify(songWords).saveAll(anyList());
+        order.verify(events).publishEvent(new SongGenerationRequested(12L));
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SongWord>> captor = ArgumentCaptor.forClass(List.class);
         verify(songWords).saveAll(captor.capture());
@@ -96,7 +102,7 @@ class SongRegistrationServiceTest {
 
         assertThatThrownBy(() -> service.register(child)).isInstanceOf(IllegalStateException.class);
 
-        verifyNoInteractions(songs, songWords);
+        verifyNoInteractions(songs, songWords, events);
     }
 
     private List<LearnedWord> selectedCards() {

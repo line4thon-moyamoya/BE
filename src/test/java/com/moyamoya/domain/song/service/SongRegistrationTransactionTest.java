@@ -78,7 +78,7 @@ class SongRegistrationTransactionTest {
             }
             return invocation.getArgument(0);
         });
-        var registration = proxy(new SongRegistrationService(cards, songs, songWords), transactions);
+        var registration = proxy(new SongRegistrationService(cards, songs, songWords, mock(org.springframework.context.ApplicationEventPublisher.class)), transactions);
         var acquisition = proxy(new WordCardAcquisitionService(children, words, cards, registration), transactions);
 
         if (fail) {
@@ -100,7 +100,7 @@ class SongRegistrationTransactionTest {
         var cards = mock(LearnedWordRepository.class);
         var songs = mock(SongRepository.class);
         var songWords = mock(SongWordRepository.class);
-        var service = proxy(new SongRegistrationService(cards, songs, songWords), new RecordingTransactionManager());
+        var service = proxy(new SongRegistrationService(cards, songs, songWords, mock(org.springframework.context.ApplicationEventPublisher.class)), new RecordingTransactionManager());
 
         assertThatThrownBy(() -> service.register(mock(Child.class)))
                 .isInstanceOf(IllegalTransactionStateException.class);

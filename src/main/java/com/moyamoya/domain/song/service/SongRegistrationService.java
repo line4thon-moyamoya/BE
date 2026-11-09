@@ -4,11 +4,13 @@ import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.song.entity.Song;
 import com.moyamoya.domain.song.entity.SongWord;
 import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.model.SongGenerationRequested;
 import com.moyamoya.domain.song.repository.SongRepository;
 import com.moyamoya.domain.song.repository.SongWordRepository;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,8 +23,8 @@ public class SongRegistrationService {
     private final LearnedWordRepository learnedWordRepository;
     private final SongRepository songRepository;
     private final SongWordRepository songWordRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    // 아이 행 잠금을 획득한 카드 저장 트랜잭션에서 호출한다.
     @Transactional(propagation = Propagation.MANDATORY)
     public SongRegistrationResult register(Child child) {
         long couponCount = learnedWordRepository.countUnusedForSongByChildId(child.getId());
@@ -41,6 +43,7 @@ public class SongRegistrationService {
             songWords.add(SongWord.create(song, cards.get(index), index + 1));
         }
         songWordRepository.saveAll(songWords);
+        eventPublisher.publishEvent(new SongGenerationRequested(song.getId()));
         return new SongRegistrationResult(couponCount - CARDS_PER_SONG, song.getId());
     }
 }
