@@ -51,3 +51,9 @@ question:
 tts:
   processor-connect-timeout-ms: ${TTS_PROCESSOR_CONNECT_TIMEOUT_MS:2000}
   processor-read-timeout-ms: ${TTS_PROCESSOR_READ_TIMEOUT_MS:5000}
+
+song:
+  mixing:
+    backing-track-path: ${SONG_BACKING_TRACK_PATH:}
+    output-directory: ${SONG_OUTPUT_DIRECTORY:local-song-output}
+    processor-read-timeout-ms: ${SONG_MIX_READ_TIMEOUT_MS:65000}
