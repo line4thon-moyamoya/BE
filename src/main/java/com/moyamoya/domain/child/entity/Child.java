@@ -65,4 +65,8 @@ public class Child extends BaseTimeEntity {
         this.ageGroup = ageGroup;
         this.moyaType = moyaType;
     }
+
+    public void updateMoyaType(MoyaType moyaType) {
+        this.moyaType = moyaType;
+    }
 }
