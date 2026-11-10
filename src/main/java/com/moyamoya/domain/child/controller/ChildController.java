@@ -2,8 +2,10 @@ package com.moyamoya.domain.child.controller;
 
 import lombok.RequiredArgsConstructor;
 import com.moyamoya.domain.child.dto.request.CreateChildRequest;
+import com.moyamoya.domain.child.dto.request.InitialChildProfileRequest;
 import com.moyamoya.domain.child.dto.request.UpdateChildRequest;
 import com.moyamoya.domain.child.dto.response.ChildResponse;
+import com.moyamoya.domain.child.dto.response.InitialChildProfileResponse;
 import com.moyamoya.domain.child.service.ChildService;
 import com.moyamoya.global.common.BaseResponse;
 import com.moyamoya.security.parentmode.ParentModeRequired;
@@ -33,6 +35,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/children")
 @Tag(name = "Child", description = "아이 프로필 API")
 public class ChildController {
+    @Operation(summary = "초기 아이 프로필 설정",
+            description = "첫 실행 시 모야 유형을 선택합니다. 로그인 토큰만 필요하며 본인 계정의 아이만 설정할 수 있습니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "초기 아이 프로필 설정 성공"),
+            @ApiResponse(responseCode = "400", description = "모야 유형 누락 또는 잘못된 요청"),
+            @ApiResponse(responseCode = "401", description = "로그인 필요"),
+            @ApiResponse(responseCode = "403", description = "다른 계정의 아이 설정 요청"),
+            @ApiResponse(responseCode = "404", description = "아이 프로필 없음")
+    })
+    @PatchMapping("/{childId}/initial-profile")
+    public ResponseEntity<BaseResponse<InitialChildProfileResponse>> setupInitialProfile(
+            Principal principal,
+            @PathVariable("childId") Long childId,
+            @RequestBody InitialChildProfileRequest request
+    ) {
+        InitialChildProfileResponse response = childService.setupInitialProfile(
+                Long.valueOf(principal.getName()), childId, request);
+        return ResponseEntity.ok(BaseResponse.success("초기 아이 프로필이 설정되었습니다.", response));
+    }
+
     private static final String UPDATE_SUCCESS_EXAMPLE = """
             {"success": true, "code": 200, "message": "아이 프로필이 수정되었습니다.", "data": {}}
             """;
