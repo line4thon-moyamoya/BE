@@ -27,7 +27,7 @@ class RepetitionEvaluationServiceTest {
 
     private QuestionWordData data(String word, String expected, String age3) {
         return new QuestionWordData(word, word, null, null, null, null, null,
-                expected, age3, null, null, null, null, null, null, null);
+                expected, age3, null, null, null, null, null, null);
     }
 
     @ParameterizedTest
