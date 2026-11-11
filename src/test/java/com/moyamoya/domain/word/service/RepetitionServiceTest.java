@@ -6,6 +6,9 @@ import static org.mockito.Mockito.*;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.entity.SongStatus;
+import com.moyamoya.domain.song.service.SongRegistrationService;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.service.PronunciationSimilarity;
@@ -34,6 +37,7 @@ class RepetitionServiceTest {
     @Mock private ChildRepository children;
     @Mock private WordRepository words;
     @Mock private LearnedWordRepository cards;
+    @Mock private SongRegistrationService songs;
     @Mock private SttService stt;
     @Mock private MoyaTtsService tts;
     @Mock private QuestionDataLoader loader;
@@ -46,7 +50,8 @@ class RepetitionServiceTest {
     void setUp() {
         service = new RepetitionService(children, words, stt,
                 new RepetitionEvaluationService(new PronunciationSimilarity(), loader, words),
-                new WordCardAcquisitionService(children, words, cards), new RepetitionDialogueService(tts));
+                new WordCardAcquisitionService(children, words, cards, songs), new RepetitionDialogueService(tts));
+        lenient().when(songs.register(any())).thenReturn(new SongRegistrationResult(0, 12L));
     }
 
     private void ownedWord() {
@@ -87,13 +92,55 @@ class RepetitionServiceTest {
         assertThat(result.learnedWordId()).isEqualTo(35L);
         assertThat(result.isCorrect()).isEqualTo(correct);
         assertThat(result.isNewAcquisition()).isTrue();
+        assertThat(result.couponCount()).isZero();
+        assertThat(result.song().songId()).isEqualTo(12L);
+        assertThat(result.song().status()).isEqualTo(SongStatus.GENERATING);
         assertThat(result.repetitionDialogue().text()).isEqualTo(correct
                 ? "우와! 적금! 잘했어!" : "적금! 적금! 다음에 또 해보자!");
-        assertThat(result.acquisitionDialogue().text()).isEqualTo("새로운 단어 카드를 받았어! 수첩에서 확인해 봐!");
+        assertThat(result.acquisitionDialogue().text()).isEqualTo("쿠폰 다섯 장을 다 모았어!");
         var order = inOrder(stt, children, cards);
         order.verify(stt).transcribe(audio);
         order.verify(children).findByIdForUpdate(2L);
         order.verify(cards).save(any());
+    }
+
+    @Test
+    void registrationDialogueTtsFailureKeepsSongInformation() {
+        ownedWord();
+        allowAcquisition();
+        when(stt.transcribe(audio)).thenReturn("적금");
+        when(cards.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tts.synthesize(anyString())).thenThrow(new IllegalStateException("TTS unavailable"));
+
+        var result = service.repeat(7L, 2L, 1L, audio);
+
+        assertThat(result.song().songId()).isEqualTo(12L);
+        assertThat(result.song().status()).isEqualTo(SongStatus.GENERATING);
+        assertThat(result.couponCount()).isZero();
+        assertThat(result.acquisitionDialogue().text()).isEqualTo("쿠폰 다섯 장을 다 모았어!");
+        assertThat(result.acquisitionDialogue().audioBase64()).isNull();
+        assertThat(result.acquisitionDialogue().audioContentType()).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,네", "2,세", "3,두", "4,한"})
+    void couponCountSelectsMatchingDialogueAndTts(long count, String remaining) {
+        ownedWord();
+        allowAcquisition();
+        when(stt.transcribe(audio)).thenReturn("적금");
+        when(cards.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(songs.register(child)).thenReturn(new SongRegistrationResult(count, null));
+        String text = "쿠폰 받았다! 짝짝! 노래까지 " + remaining + " 개 남았어!";
+        when(tts.synthesize(text)).thenReturn(new byte[]{1, 2});
+
+        var result = service.repeat(7L, 2L, 1L, audio);
+
+        assertThat(result.couponCount()).isEqualTo(count);
+        assertThat(result.song()).isNull();
+        assertThat(result.acquisitionDialogue().text()).isEqualTo(text);
+        assertThat(result.acquisitionDialogue().audioBase64()).isEqualTo("AQI=");
+        assertThat(result.acquisitionDialogue().audioContentType()).isEqualTo("audio/wav");
+        verify(tts).synthesize(text);
     }
 
     @Test
@@ -110,6 +157,8 @@ class RepetitionServiceTest {
 
         assertThat(result.isCorrect()).isTrue();
         assertThat(result.isNewAcquisition()).isFalse();
+        assertThat(result.song()).isNull();
+        verifyNoInteractions(songs);
         assertThat(card.isNew()).isFalse();
         assertThat(card.isStickerEarned()).isTrue();
         verify(cards, never()).save(any());

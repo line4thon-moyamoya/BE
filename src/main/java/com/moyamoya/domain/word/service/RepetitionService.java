@@ -2,6 +2,8 @@ package com.moyamoya.domain.word.service;
 
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.song.dto.response.SongRegistrationResponse;
+import com.moyamoya.domain.song.entity.SongStatus;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.service.SttService;
 import com.moyamoya.domain.word.dto.response.RepetitionResponse;
@@ -45,12 +47,14 @@ public class RepetitionService {
 
         String recognizedText = transcribe(audio);
         var evaluation = evaluationService.evaluate(recognizedText, word.getWord(), child.getAgeGroup());
-        // STT 호출이 끝난 뒤 별도 트랜잭션에서 카드 저장 및 소유권 재확인
         var acquisition = acquisitionService.acquireCard(userId, childId, wordId, evaluation.isCorrect());
+        SongRegistrationResponse song = acquisition.songId() == null ? null
+                : new SongRegistrationResponse(acquisition.songId(), SongStatus.GENERATING);
         return new RepetitionResponse(wordId, acquisition.learnedWordId(),
                 evaluation.isCorrect(), acquisition.isNewAcquisition(),
+                acquisition.couponCount(), song,
                 dialogueService.repetition(word.getWord(), evaluation.isCorrect()),
-                dialogueService.acquisition(acquisition.isNewAcquisition()));
+                dialogueService.acquisition(acquisition.isNewAcquisition(), acquisition.couponCount(), song != null));
     }
 
     private String transcribe(MultipartFile audio) {

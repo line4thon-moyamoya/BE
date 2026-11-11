@@ -2,6 +2,8 @@ package com.moyamoya.domain.word.service;
 
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.service.SongRegistrationService;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.exception.WordErrorCode;
@@ -20,11 +22,8 @@ public class WordCardAcquisitionService {
     private final ChildRepository childRepository;
     private final WordRepository wordRepository;
     private final LearnedWordRepository learnedWordRepository;
+    private final SongRegistrationService songRegistrationService;
 
-    /**
-     * STT 판정 후 별도 트랜잭션에서 카드를 저장하고, 안내 TTS는 저장 후 호출한다.
-     * 같은 아이의 획득 요청은 아이 행 잠금으로 직렬화하며, 재학습은 NEW를 변경하지 않는다.
-     */
     @Transactional
     public CardAcquisitionResult acquireCard(Long userId, Long childId, Long wordId, boolean isCorrect) {
         if (userId == null || userId <= 0) {
@@ -50,6 +49,10 @@ public class WordCardAcquisitionService {
         } else if (isCorrect) {
             card.earnSticker();
         }
-        return new CardAcquisitionResult(card.getId(), isNewAcquisition, card.isStickerEarned());
+        SongRegistrationResult registration = isNewAcquisition
+                ? songRegistrationService.register(child)
+                : new SongRegistrationResult(learnedWordRepository.countUnusedForSongByChildId(childId), null);
+        return new CardAcquisitionResult(card.getId(), isNewAcquisition, card.isStickerEarned(),
+                registration.couponCount(), registration.songId());
     }
 }

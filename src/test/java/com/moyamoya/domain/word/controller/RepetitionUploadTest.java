@@ -93,7 +93,7 @@ class RepetitionUploadTest {
     @Test
     void validFileStillReachesRepetitionController() {
         when(service.repeat(eq(7L), eq(2L), eq(1L), any()))
-                .thenReturn(new RepetitionResponse(1L, 35L, true, true, null, null));
+                .thenReturn(new RepetitionResponse(1L, 35L, true, true, 1, null, null, null));
         var response = upload(REPETITION, 128);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getBody()).contains("\"isCorrect\":true");
