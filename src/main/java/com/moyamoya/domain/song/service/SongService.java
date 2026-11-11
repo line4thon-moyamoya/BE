@@ -11,7 +11,7 @@ import com.moyamoya.domain.song.exception.SongErrorCode;
 import com.moyamoya.domain.song.repository.SongRepository;
 import com.moyamoya.domain.song.repository.SongWordRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +24,7 @@ public class SongService {
     private final ChildRepository childRepository;
     private final SongRepository songRepository;
     private final SongWordRepository songWordRepository;
-    private final S3AudioService s3AudioService;
+    private final S3Service S3Service;
 
     @Transactional(readOnly = true)
     public SongListResponse getSongs(Long userId, Long childId) {
@@ -57,7 +57,7 @@ public class SongService {
                 .map(sw -> SongWordResponse.from(sw.getLearnedWord().getWord(), child.getAgeGroup()))
                 .toList();
         return new SongDetailResponse(song.getId(), song.getTitle(), song.getStatus(),
-                s3AudioService.getPresignedUrl(song.getAudioUrl()), words);
+                S3Service.getPresignedUrl(song.getAudioUrl()), words);
     }
 
     private Child validateChildOwnership(Long userId, Long childId) {

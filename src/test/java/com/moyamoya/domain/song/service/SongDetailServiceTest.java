@@ -15,7 +15,7 @@ import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -31,7 +31,7 @@ class SongDetailServiceTest {
     private final ChildRepository children = mock(ChildRepository.class);
     private final SongRepository songs = mock(SongRepository.class);
     private final SongWordRepository songWords = mock(SongWordRepository.class);
-    private final S3AudioService audio = mock(S3AudioService.class);
+    private final S3Service audio = mock(S3Service.class);
     private final SongService service = new SongService(children, songs, songWords, audio);
 
     private Child ownedChild(AgeGroup ageGroup) {

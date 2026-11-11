@@ -3,7 +3,7 @@ package com.moyamoya.domain.song.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.io.ByteArrayInputStream;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.core.ResponseInputStream;
@@ -14,7 +14,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 class SongAudioStorageServiceTest {
     private final S3Client s3 = mock(S3Client.class);
-    private final S3AudioService audio = mock(S3AudioService.class);
+    private final S3Service audio = mock(S3Service.class);
 
     private SongAudioStorageService storage() {
         return new SongAudioStorageService(s3, audio, "test-bucket", "local");
