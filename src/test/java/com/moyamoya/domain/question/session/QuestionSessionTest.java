@@ -284,6 +284,7 @@ class QuestionSessionTest {
                 "뜻",
                 null,
                 null,
+                null,
                 null
         );
     }

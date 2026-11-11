@@ -10,7 +10,8 @@ public record CandidateResponse(
         String description,
         String imageUrl,
         String wordAudioUrl,
-        String wordAudioBase64
+        String wordAudioBase64,
+        String wordAudioContentType
 ) {
     public static CandidateResponse from(WordCandidate candidate) {
         return new CandidateResponse(
@@ -20,7 +21,8 @@ public record CandidateResponse(
                 candidate.definition(),
                 candidate.imageUrl(),
                 candidate.wordAudioUrl(),
-                candidate.wordAudioBase64()
+                candidate.wordAudioBase64(),
+                candidate.wordAudioContentType()
         );
     }
 }

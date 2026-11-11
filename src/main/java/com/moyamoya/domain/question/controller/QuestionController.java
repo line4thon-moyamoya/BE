@@ -63,7 +63,8 @@ public class QuestionController {
                     "description": "은행에 매달 정해진 돈을 넣어서 크게 모으는 거야.",
                     "imageUrl": null,
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
-                    "wordAudioBase64": null
+                    "wordAudioBase64": null,
+                    "wordAudioContentType": null
                   },
                   {
                     "candidateId": "c_002",
@@ -72,7 +73,8 @@ public class QuestionController {
                     "description": "돈을 은행에 맡겨 두었다가 나중에 찾는 거야.",
                     "imageUrl": null,
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
-                    "wordAudioBase64": null
+                    "wordAudioBase64": null,
+                    "wordAudioContentType": null
                   }
                 ],
                 "dialogue": {
@@ -176,7 +178,8 @@ public class QuestionController {
                     "description": "나중을 위해 모아두는 돈이야.",
                     "imageUrl": "https://cdn.example.com/images/word-112.png",
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
-                    "wordAudioBase64": null
+                    "wordAudioBase64": null,
+                    "wordAudioContentType": null
                   }
                 ],
                 "dialogue": {

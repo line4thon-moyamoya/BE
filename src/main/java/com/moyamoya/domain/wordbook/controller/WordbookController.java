@@ -40,7 +40,8 @@ public class WordbookController {
               "data": {
                 "totalCount": 2,
                 "learnedWords": [
-                  {"learnedWordId": 35, "wordId": 1, "word": "자동차", "imageUrl": "https://example.com/presigned-image", "stickerEarned": true, "isNew": true},
+                  {"learnedWordId": 35, "wordId": 1, "word": "적금", "imageUrl": null, "stickerEarned": true, "isNew": true},
+                  {"learnedWordId": 34, "wordId": 2, "word": "자동차", "imageUrl": "/images/words/car.png", "stickerEarned": false, "isNew": false}
                 ]
               }
             }

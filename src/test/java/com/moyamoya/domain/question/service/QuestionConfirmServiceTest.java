@@ -82,6 +82,7 @@ class QuestionConfirmServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -112,6 +113,7 @@ class QuestionConfirmServiceTest {
                 0.0,
                 0.9,
                 "정의",
+                null,
                 null,
                 null,
                 null
@@ -152,7 +154,7 @@ class QuestionConfirmServiceTest {
                 WordSourceType.CURATED,
                 0.9, 0.0, 0.9,
                 "돈을 모으는 방법",
-                null, null, null
+                null, null, null, null
         )));
 
         Word word = mock(Word.class);

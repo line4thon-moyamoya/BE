@@ -344,7 +344,9 @@ public class QuestionService {
                             candidate.finalScore(),
                             resolvedDescription,
                             word.getImageUrl() != null ? word.getImageUrl() : candidate.imageUrl(),
-                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl()
+                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
+                            null,
+                            null
                     );
                 })
                 .toList();
@@ -360,50 +362,55 @@ public class QuestionService {
                             .orElse(null);
 
                     if (existingWord != null) {
-                        candidateTtsService.ensureStoredAudio(existingWord);
+                       candidateTtsService.ensureStoredAudio(existingWord);
 
-                        String wordAudioUrl =
-                                candidateTtsService.resolveAudioUrl(
-                                        existingWord.getWordAudioUrl()
-                                );
-                        String imageUrl =
-                                candidateTtsService.resolvePresignedUrl(
-                                        existingWord.getImageUrl()
-                                );
+                       String wordAudioUrl =
+                               candidateTtsService.resolveAudioUrl(
+                                       existingWord.getWordAudioUrl()
+                               );
+                       String imageUrl =
+                               candidateTtsService.resolvePresignedUrl(
+                                       existingWord.getImageUrl()
+                               );
 
-                        return new WordCandidate(
-                                candidate.candidateId(),
-                                existingWord.getId(),
-                                candidate.word(),
-                                existingWord.getSourceType(),
-                                candidate.pronunciationScore(),
-                                candidate.contextScore(),
-                                candidate.finalScore(),
-                                candidate.definition(),
-                                imageUrl,
-                                wordAudioUrl,
-                                null
-                        );
+                       return new WordCandidate(
+                               candidate.candidateId(),
+                               existingWord.getId(),
+                               candidate.word(),
+                               existingWord.getSourceType(),
+                               candidate.pronunciationScore(),
+                               candidate.contextScore(),
+                               candidate.finalScore(),
+                               candidate.definition(),
+                               imageUrl,
+                               wordAudioUrl,
+                               null,
+                               null
+                       );
                     }
 
                     String wordAudioBase64 =
-                            candidateTtsService.generateBase64IfNeeded(
-                                    candidate.word(),
-                                    null
-                            );
+                           candidateTtsService.generateBase64IfNeeded(
+                                   candidate.word(),
+                                   null
+                           );
+                    String wordAudioContentType = hasText(wordAudioBase64)
+                           ? candidateTtsService.resolveGeneratedAudioContentType()
+                           : null;
 
                     return new WordCandidate(
-                            candidate.candidateId(),
-                            candidate.wordId(),
-                            candidate.word(),
-                            candidate.sourceType(),
-                            candidate.pronunciationScore(),
-                            candidate.contextScore(),
-                            candidate.finalScore(),
-                            candidate.definition(),
-                            candidate.imageUrl(),
-                            null,
-                            wordAudioBase64
+                           candidate.candidateId(),
+                           candidate.wordId(),
+                           candidate.word(),
+                           candidate.sourceType(),
+                           candidate.pronunciationScore(),
+                           candidate.contextScore(),
+                           candidate.finalScore(),
+                           candidate.definition(),
+                           candidate.imageUrl(),
+                           null,
+                           wordAudioBase64,
+                           wordAudioContentType
                     );
                 })
                 .toList();

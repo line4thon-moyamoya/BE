@@ -99,6 +99,7 @@ class QuestionServiceTest {
                         "기존정의",
                         null,
                         null,
+                        null,
                         null
                 )));
         when(rankingService.resolveTargetPronunciation(any()))
@@ -150,6 +151,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -162,6 +164,7 @@ class QuestionServiceTest {
                 0.6,
                 0.75,
                 "정의2",
+                null,
                 null,
                 null,
                 null
@@ -238,6 +241,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -250,6 +254,7 @@ class QuestionServiceTest {
                 0.6,
                 0.75,
                 "정의2",
+                null,
                 null,
                 null,
                 null
@@ -299,6 +304,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -311,6 +317,7 @@ class QuestionServiceTest {
                 0.6,
                 0.75,
                 "정의2",
+                null,
                 null,
                 null,
                 null
