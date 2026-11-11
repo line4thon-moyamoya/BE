@@ -110,11 +110,15 @@ class QuestionServiceTest {
         when(word.getDefinition()).thenReturn("나라에 내는 돈");
         when(word.getDescAge3To4()).thenReturn("나라에 내는 돈(3-4)");
         when(word.getSourceType()).thenReturn(WordSourceType.CURATED);
+        when(word.getImageUrl()).thenReturn("words/images/42.png");
         when(word.getWordAudioUrl())
                 .thenReturn("words/audio/42/word.wav");
         when(candidateTtsService.resolveAudioUrl(
                 "words/audio/42/word.wav"
         )).thenReturn("https://audio.example/word.wav");
+        when(candidateTtsService.resolvePresignedUrl(
+                "words/images/42.png"
+        )).thenReturn("https://image.example/42.png");
         when(wordRepository.findByWord("세금")).thenReturn(Optional.of(word));
 
         var response = questionService.testStt(1L, "엄마, 데금이 뭐야?");
@@ -124,6 +128,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().description()).isEqualTo("나라에 내는 돈(3-4)");
         assertThat(response.candidates().getFirst().wordAudioUrl())
                 .isEqualTo("https://audio.example/word.wav");
+        assertThat(response.candidates().getFirst().imageUrl())
+                .isEqualTo("https://image.example/42.png");
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
         assertThat(response.dialogue()).isNotNull();
         assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");

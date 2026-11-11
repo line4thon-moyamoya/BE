@@ -389,6 +389,10 @@ public class QuestionService {
                                 candidateTtsService.resolveAudioUrl(
                                         descriptionKey
                                 );
+                        String imageUrl =
+                                candidateTtsService.resolvePresignedUrl(
+                                        existingWord.getImageUrl()
+                                );
 
                         return new WordCandidate(
                                 candidate.candidateId(),
@@ -399,7 +403,7 @@ public class QuestionService {
                                 candidate.contextScore(),
                                 candidate.finalScore(),
                                 candidate.definition(),
-                                candidate.imageUrl(),
+                                imageUrl,
                                 wordAudioUrl,
                                 descriptionAudioUrl,
                                 null,

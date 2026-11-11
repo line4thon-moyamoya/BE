@@ -32,4 +32,4 @@ tts:
 
 aws:
   s3:
-    prefix: ${S3_PREFIX:dev}
+    prefix: ${S3_PREFIX:local}

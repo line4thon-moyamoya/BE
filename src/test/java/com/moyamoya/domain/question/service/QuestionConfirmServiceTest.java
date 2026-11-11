@@ -13,7 +13,7 @@ import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import com.moyamoya.domain.question.session.QuestionSessionStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class QuestionConfirmServiceTest {
     private WordRepository wordRepository;
     private QuestionHistoryRepository questionHistoryRepository;
     private CandidateTtsService candidateTtsService;
-    private S3AudioService s3AudioService;
+    private S3Service s3Service;
     private TransactionTemplate transactionTemplate;
 
     private QuestionConfirmService questionConfirmService;
@@ -48,7 +48,7 @@ class QuestionConfirmServiceTest {
         wordRepository = mock(WordRepository.class);
         questionHistoryRepository = mock(QuestionHistoryRepository.class);
         candidateTtsService = mock(CandidateTtsService.class);
-        s3AudioService = mock(S3AudioService.class);
+        s3Service = mock(S3Service.class);
         transactionTemplate = mock(TransactionTemplate.class);
 
         when(transactionTemplate.execute(any()))
@@ -62,7 +62,7 @@ class QuestionConfirmServiceTest {
                 wordRepository,
                 questionHistoryRepository,
                 candidateTtsService,
-                s3AudioService,
+                s3Service,
                 transactionTemplate
         );
     }
@@ -158,6 +158,9 @@ class QuestionConfirmServiceTest {
         Word word = mock(Word.class);
         when(word.getId()).thenReturn(10L);
         when(word.getWord()).thenReturn("적금");
+        when(word.getImageUrl()).thenReturn("words/images/10.png");
+        when(candidateTtsService.resolvePresignedUrl("words/images/10.png"))
+                .thenReturn("https://image.example/10.png");
 
         when(sessionStore.find(session.getSessionId()))
                 .thenReturn(Optional.of(session));
@@ -168,7 +171,7 @@ class QuestionConfirmServiceTest {
         when(wordRepository.findByWord("적금"))
                 .thenReturn(Optional.of(word));
 
-        questionConfirmService.confirmWord(
+        var response = questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
                 "c_001"
@@ -176,6 +179,7 @@ class QuestionConfirmServiceTest {
 
         assertThat(session.getStatus())
                 .isEqualTo(QuestionSessionStatus.CONFIRMED);
+        assertThat(response.imageUrl()).isEqualTo("https://image.example/10.png");
 
         org.mockito.Mockito.verify(questionHistoryRepository)
                 .save(any());

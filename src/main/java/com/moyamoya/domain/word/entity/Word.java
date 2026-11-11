@@ -156,4 +156,7 @@ public class Word extends BaseTimeEntity {
     public void updateDescriptionAudioAge5Url(String s3Key) {
         this.descriptionAudioAge5Url = s3Key;
     }
+
+    // 단어 이미지의 S3 객체 키 저장
+    public void updateImageUrl(String s3Key) { this.imageUrl = s3Key; }
 }

@@ -12,6 +12,7 @@ import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
+import com.moyamoya.global.s3.S3Service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ class WordLookupTransactionTest {
         WordRepository words = mock(WordRepository.class);
         LearnedWordRepository cards = mock(LearnedWordRepository.class);
         CandidateTtsService tts = mock(CandidateTtsService.class);
+        S3Service s3Service = mock(S3Service.class);
         EntityManager em = mock(EntityManager.class);
         User owner = mock(User.class);
         when(owner.getId()).thenReturn(7L);
@@ -72,13 +74,16 @@ class WordLookupTransactionTest {
             return null;
         }).when(tts).ensureStoredAudio(word, AgeGroup.AGE_5);
         when(tts.resolveAudioUrl("five.wav")).thenReturn("https://audio.test/five.wav");
+        when(s3Service.getPresignedUrl("image.png"))
+                .thenReturn("https://s3.test/presigned/image.png");
 
         WordLookupService lookup = proxy(new WordLookupService(children, words, cards), transactions);
         WordDescriptionAudioService audio = proxy(new WordDescriptionAudioService(tts, em), transactions);
         if (cardDetail) {
-            var response = proxy(new WordCardService(lookup, audio), transactions).getWordCardDetail(7L, 2L, 35L);
+            var response = proxy(new WordCardService(lookup, audio, s3Service), transactions)
+                    .getWordCardDetail(7L, 2L, 35L);
             assertThat(response.learnedWordId()).isEqualTo(35L);
-            assertThat(response.imageUrl()).isEqualTo("image.png");
+            assertThat(response.imageUrl()).isEqualTo("https://s3.test/presigned/image.png");
             assertThat(response.descriptionAudioUrl()).isEqualTo("https://audio.test/five.wav");
         } else {
             var response = proxy(new WordService(lookup, audio), transactions).getWordDescription(7L, 1L, 2L);

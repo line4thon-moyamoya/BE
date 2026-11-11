@@ -3,7 +3,7 @@ package com.moyamoya.domain.question.service;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -15,7 +15,7 @@ import java.util.Base64;
 public class CandidateTtsService {
 
     private final MoyaTtsService moyaTtsService;
-    private final S3AudioService s3AudioService;
+    private final S3Service s3Service;
     private final WordRepository wordRepository;
 
     // 신규 외부 단어: S3에 저장하지 않고 Base64만 생성
@@ -45,7 +45,7 @@ public class CandidateTtsService {
 
             String key = "words/audio/" + word.getId() + "/word.wav";
 
-            String uploadKey = s3AudioService.uploadWav(key, wav);
+            String uploadKey = s3Service.uploadWav(key, wav);
             word.updateWordAudioUrl(uploadKey);
         }
 
@@ -74,7 +74,7 @@ public class CandidateTtsService {
                     ? "words/audio/" + word.getId() + "/desc-age-3-4.wav"
                     : "words/audio/" + word.getId() + "/desc-age-5.wav";
 
-            String uploadKey = s3AudioService.uploadWav(key, wav);
+            String uploadKey = s3Service.uploadWav(key, wav);
 
             if (age3To4) {
                 word.updateDescriptionAudioAge3To4Url(uploadKey);
@@ -89,10 +89,14 @@ public class CandidateTtsService {
 
     // DB에 저장된 S3 객체 키를 재생 URL로 변환
     public String resolveAudioUrl(String s3Key) {
+        return resolvePresignedUrl(s3Key);
+    }
+
+    public String resolvePresignedUrl(String s3Key) {
         if (!StringUtils.hasText(s3Key)) {
             return null;
         }
 
-        return s3AudioService.getPresignedUrl(s3Key);
+        return s3Service.getPresignedUrl(s3Key);
     }
 }

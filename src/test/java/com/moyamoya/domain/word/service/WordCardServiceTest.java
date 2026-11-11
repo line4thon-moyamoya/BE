@@ -14,6 +14,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
+import com.moyamoya.global.s3.S3Service;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,9 +26,11 @@ class WordCardServiceTest {
     private final ChildRepository children = mock(ChildRepository.class);
     private final LearnedWordRepository cards = mock(LearnedWordRepository.class);
     private final CandidateTtsService tts = mock(CandidateTtsService.class);
+    private final S3Service s3Service = mock(S3Service.class);
     private final WordCardService service = new WordCardService(new WordLookupService(children,
             mock(WordRepository.class), cards),
-            new WordDescriptionAudioService(tts, mock(EntityManager.class)));
+            new WordDescriptionAudioService(tts, mock(EntityManager.class)),
+            s3Service);
 
     private Child child(AgeGroup age) {
         User owner = mock(User.class);
@@ -45,6 +48,7 @@ class WordCardServiceTest {
                 null, "노래", null, "image.png", null, "young.wav", "five.wav");
         LearnedWord card = LearnedWord.create(child, word, true);
         when(tts.resolveAudioUrl(anyString())).thenAnswer(invocation -> "https://audio.test/" + invocation.getArgument(0));
+        when(s3Service.getPresignedUrl("image.png")).thenReturn("https://s3.test/presigned/image.png");
         when(cards.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.of(card));
 
         var result = service.getWordCardDetail(7L, 2L, 35L);
@@ -53,7 +57,7 @@ class WordCardServiceTest {
         assertThat(result.description()).isEqualTo(age == AgeGroup.AGE_3_4 ? "어린 설명" : "다섯 살 설명");
         assertThat(result.descriptionAudioUrl()).isEqualTo("https://audio.test/" + (age == AgeGroup.AGE_3_4 ? "young.wav" : "five.wav"));
         verify(tts, never()).ensureStoredAudio(any(), any());
-        assertThat(result.imageUrl()).isEqualTo("image.png");
+        assertThat(result.imageUrl()).isEqualTo("https://s3.test/presigned/image.png");
         assertThat(card.isNew()).isTrue();
         assertThat(card.isStickerEarned()).isTrue();
         verify(cards, never()).save(any());

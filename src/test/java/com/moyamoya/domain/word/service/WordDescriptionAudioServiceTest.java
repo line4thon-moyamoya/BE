@@ -9,7 +9,7 @@ import com.moyamoya.domain.question.service.MoyaTtsService;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class WordDescriptionAudioServiceTest {
     private final MoyaTtsService tts = mock(MoyaTtsService.class);
-    private final S3AudioService s3 = mock(S3AudioService.class);
+    private final S3Service s3 = mock(S3Service.class);
     private final WordRepository words = mock(WordRepository.class);
     private final EntityManager em = mock(EntityManager.class);
     private final WordDescriptionAudioService service = new WordDescriptionAudioService(

@@ -15,7 +15,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -35,7 +35,7 @@ public class QuestionConfirmService {
     private final WordRepository wordRepository;
     private final QuestionHistoryRepository questionHistoryRepository;
     private final CandidateTtsService candidateTtsService;
-    private final S3AudioService s3AudioService;
+    private final S3Service s3Service;
     private final TransactionTemplate transactionTemplate;
 
     public ConfirmWordResponse confirmWord(
@@ -116,6 +116,7 @@ public class QuestionConfirmService {
 
                 String wordAudioUrl;
                 String descriptionAudioUrl;
+                String imageUrl;
                 try {
                     wordAudioUrl = candidateTtsService.resolveAudioUrl(
                             word.getWordAudioUrl()
@@ -123,6 +124,10 @@ public class QuestionConfirmService {
 
                     descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
                             descriptionKey
+                    );
+
+                    imageUrl = candidateTtsService.resolvePresignedUrl(
+                            word.getImageUrl()
                     );
                 } catch (RuntimeException exception) {
                     throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
@@ -133,7 +138,7 @@ public class QuestionConfirmService {
                         word.getId(),
                         word.getWord(),
                         candidate.definition(),
-                        word.getImageUrl(),
+                        imageUrl,
                         wordAudioUrl,
                         descriptionAudioUrl,
                         "WORD_LEARNING"
@@ -231,7 +236,7 @@ public class QuestionConfirmService {
                 + "/" + type + ".wav";
 
         try {
-            return s3AudioService.uploadWav(key, wav);
+            return s3Service.uploadWav(key, wav);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
         }
