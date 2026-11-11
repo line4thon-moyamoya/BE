@@ -45,7 +45,7 @@ class WordCardServiceTest {
     void selectsAgeSpecificFieldsWithoutChangingNewOrSticker(AgeGroup age) {
         Child child = child(age);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명", null,
-                null, "노래", null, "image.png", null, "young.wav", "five.wav");
+                null, null, "image.png", null, "young.wav", "five.wav");
         LearnedWord card = LearnedWord.create(child, word, true);
         when(tts.resolveAudioUrl(anyString())).thenAnswer(invocation -> "https://audio.test/" + invocation.getArgument(0));
         when(s3Service.getPresignedUrl("image.png")).thenReturn("https://s3.test/presigned/image.png");

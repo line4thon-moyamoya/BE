@@ -44,7 +44,7 @@ class WordLookupTransactionTest {
         when(owner.getId()).thenReturn(7L);
         Child child = Child.create(owner, "지우", AgeGroup.AGE_5);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명",
-                null, null, "노래", null, "image.png", null, null, null);
+                null, null, null, "image.png", null, null, null);
         ReflectionTestUtils.setField(word, "id", 1L);
         when(children.findById(2L)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();

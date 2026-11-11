@@ -26,8 +26,7 @@ class WordDescriptionAudioServiceTest {
             new CandidateTtsService(tts, s3, words), em);
 
     private Word word(String desc3, String desc5, String audio3, String audio5) {
-        Word word = Word.createExternal("적금", "기본 설명", null, desc3, desc5, null, null,
-                "노래", null, null, "dev/word.wav", audio3, audio5);
+        Word word = Word.createExternal("적금", "기본 설명", null, desc3, desc5, null, null, null, null, "dev/word.wav", audio3, audio5);
         ReflectionTestUtils.setField(word, "id", 1L);
         return word;
     }

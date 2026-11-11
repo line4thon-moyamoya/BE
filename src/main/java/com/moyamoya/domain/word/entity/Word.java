@@ -44,9 +44,6 @@ public class Word extends BaseTimeEntity {
     @Column(name = "hint", columnDefinition = "TEXT")
     private String hint;
 
-    @Column(name = "song_description", nullable = false, columnDefinition = "TEXT")
-    private String songDescription;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "heard_from", length = 20)
     private HeardFrom heardFrom;
@@ -78,7 +75,6 @@ public class Word extends BaseTimeEntity {
             String descAge5,
             String example,
             String hint,
-            String songDescription,
             HeardFrom heardFrom,
             String imageUrl,
             String wordAudioUrl,
@@ -94,7 +90,6 @@ public class Word extends BaseTimeEntity {
         newWord.descAge5 = descAge5;
         newWord.example = example;
         newWord.hint = hint;
-        newWord.songDescription = songDescription;
         newWord.heardFrom = heardFrom;
         newWord.imageUrl = imageUrl;
         newWord.wordAudioUrl = wordAudioUrl;
@@ -115,7 +110,6 @@ public class Word extends BaseTimeEntity {
             String descAge5,
             String example,
             String hint,
-            String songDescription,
             HeardFrom heardFrom
     ) {
         Word newWord = new Word();
@@ -127,7 +121,6 @@ public class Word extends BaseTimeEntity {
         newWord.descAge5 = descAge5;
         newWord.example = example;
         newWord.hint = hint;
-        newWord.songDescription = songDescription;
         newWord.heardFrom = heardFrom;
 
         // 기본 단어

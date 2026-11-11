@@ -203,7 +203,6 @@ public class QuestionConfirmService {
                 age3To4 ? null : description,
                 null,
                 null,
-                description,
                 null,
                 candidate.imageUrl(),
                 wordKey,

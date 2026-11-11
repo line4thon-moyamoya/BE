@@ -39,7 +39,7 @@ class WordServiceTest {
     void selectsDescriptionAndAudioForChildAge(AgeGroup age) {
         child(age);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명",
-                null, null, "노래", null, null, null, "young.wav", "five.wav");
+                null, null, null, null, null, "young.wav", "five.wav");
         when(tts.resolveAudioUrl(anyString())).thenAnswer(invocation -> "https://audio.test/" + invocation.getArgument(0));
         when(words.findById(1L)).thenReturn(Optional.of(word));
         var response = service.getWordDescription(7L, 1L, 2L);
