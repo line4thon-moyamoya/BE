@@ -18,9 +18,22 @@ public class RepetitionDialogueService {
         return synthesize(text);
     }
 
-    public DialogueResponse acquisition(boolean newAcquisition) {
-        String text = newAcquisition ? "새로운 단어 카드를 받았어! 수첩에서 확인해 봐!" : "이미 수첩에 있는 단어야!";
-        return synthesize(text);
+    public DialogueResponse acquisition(boolean newAcquisition, long couponCount, boolean songRegistered) {
+        if (!newAcquisition) {
+            return synthesize("이미 수첩에 있는 단어야!");
+        }
+        if (songRegistered) {
+            return synthesize("쿠폰 다섯 장을 다 모았어!");
+        }
+        String remaining = switch ((int) couponCount) {
+            case 1 -> "네";
+            case 2 -> "세";
+            case 3 -> "두";
+            case 4 -> "한";
+            default -> null;
+        };
+        return synthesize(remaining == null ? "쿠폰 받았다! 짝짝!"
+                : "쿠폰 받았다! 짝짝! 노래까지 " + remaining + " 개 남았어!");
     }
 
     private DialogueResponse synthesize(String text) {

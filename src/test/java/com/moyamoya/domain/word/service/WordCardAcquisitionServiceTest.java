@@ -6,6 +6,8 @@ import static org.mockito.Mockito.*;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
+import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.service.SongRegistrationService;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
@@ -28,13 +30,15 @@ class WordCardAcquisitionServiceTest {
     @Mock private ChildRepository children;
     @Mock private WordRepository words;
     @Mock private LearnedWordRepository cards;
+    @Mock private SongRegistrationService songs;
     private WordCardAcquisitionService service;
     private Child child;
     private Word word;
 
     @BeforeEach
     void setUp() {
-        service = new WordCardAcquisitionService(children, words, cards);
+        service = new WordCardAcquisitionService(children, words, cards, songs);
+        lenient().when(songs.register(any())).thenReturn(new SongRegistrationResult(1, null));
     }
 
     private void ownedWord() {
@@ -66,11 +70,14 @@ class WordCardAcquisitionServiceTest {
         assertThat(result.learnedWordId()).isEqualTo(35L);
         assertThat(result.isNewAcquisition()).isTrue();
         assertThat(result.stickerEarned()).isEqualTo(correct);
-        var order = inOrder(children, words, cards);
+        assertThat(result.couponCount()).isEqualTo(1);
+        assertThat(result.songId()).isNull();
+        var order = inOrder(children, words, cards, songs);
         order.verify(children).findByIdForUpdate(2L);
         order.verify(words).findById(1L);
         order.verify(cards).findByChild_IdAndWord_Id(2L, 1L);
         order.verify(cards).save(any(LearnedWord.class));
+        order.verify(songs).register(child);
     }
 
     @ParameterizedTest
@@ -93,6 +100,7 @@ class WordCardAcquisitionServiceTest {
         assertThat(card.isStickerEarned()).isEqualTo(earned || correct);
         assertThat(card.isNew()).isEqualTo(isNew);
         verify(cards, never()).save(any());
+        verifyNoInteractions(songs);
     }
 
     @Test
@@ -107,6 +115,53 @@ class WordCardAcquisitionServiceTest {
         assertThat(card.isStickerEarned()).isTrue();
         assertThat(card.isNew()).isFalse();
         verify(cards, never()).save(any());
+        verifyNoInteractions(songs);
+    }
+
+    @Test
+    void returnsSongAndRemainingCouponsAfterNewCard() {
+        ownedWord();
+        when(cards.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(songs.register(child)).thenReturn(new SongRegistrationResult(0, 12L));
+
+        var result = service.acquireCard(7L, 2L, 1L, false);
+
+        assertThat(result.couponCount()).isZero();
+        assertThat(result.songId()).isEqualTo(12L);
+        assertThat(result.isNewAcquisition()).isTrue();
+    }
+
+    @Test
+    void relearningReturnsActualCouponsWithoutRegisteringSong() {
+        ownedWord();
+        when(cards.findByChild_IdAndWord_Id(2L, 1L))
+                .thenReturn(Optional.of(LearnedWord.create(child, word, false)));
+        when(cards.countUnusedForSongByChildId(2L)).thenReturn(4L);
+
+        var result = service.acquireCard(7L, 2L, 1L, true);
+
+        assertThat(result.couponCount()).isEqualTo(4);
+        assertThat(result.songId()).isNull();
+        verifyNoInteractions(songs);
+    }
+
+    @Test
+    void retryingSameCardDoesNotRegisterAnotherSong() {
+        ownedWord();
+        LearnedWord card = LearnedWord.create(child, word, false);
+        when(cards.findByChild_IdAndWord_Id(2L, 1L))
+                .thenReturn(Optional.empty(), Optional.of(card));
+        when(cards.save(any())).thenReturn(card);
+        when(songs.register(child)).thenReturn(new SongRegistrationResult(0, 12L));
+
+        var first = service.acquireCard(7L, 2L, 1L, false);
+        var retry = service.acquireCard(7L, 2L, 1L, true);
+
+        assertThat(first.songId()).isEqualTo(12L);
+        assertThat(retry.songId()).isNull();
+        assertThat(retry.couponCount()).isZero();
+        verify(songs, times(1)).register(child);
+        verify(cards, times(1)).save(any());
     }
 
     private void error(String code, Long userId, Long childId, Long wordId) {

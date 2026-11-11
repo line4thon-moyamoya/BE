@@ -58,9 +58,7 @@ public class WordCardController {
     private final WordCardService wordCardService;
 
     @Operation(summary = "공통 단어 카드 상세 조회",
-            description = "획득한 카드의 연령별 설명과 이미지를 조회하며, 연령별 설명이 없으면 기본 정의를 사용합니다. "
-                    + "음성은 재사용하고 누락된 경우에만 TTS 생성·S3 저장합니다. 첫 생성에는 시간과 비용이 발생합니다. "
-                    + "WAV 재생 URL은 발급 후 30분 유효합니다. 스티커와 NEW는 반환하거나 변경하지 않습니다.",
+            description = "아이가 획득한 단어 카드의 단어, 설명, 이미지와 설명 음성 URL을 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "카드 상세 조회 성공",
