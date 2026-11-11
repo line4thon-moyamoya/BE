@@ -9,14 +9,10 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.core.io.Resource;
-import software.amazon.awssdk.core.sync.RequestBody;
+import org.springframework.transaction.annotation.Transactional;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-
-import java.util.Optional;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 @Slf4j
 @Component
@@ -24,108 +20,75 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class WordImageSeeder implements ApplicationRunner {
 
+    private static final String IMAGE_PREFIX = "local/words/images/";
+
     private final WordRepository wordRepository;
     private final S3Client s3Client;
-    private final TransactionTemplate transactionTemplate;
 
-    @Value("${AWS_S3_BUCKET}")
+    @Value("${aws.s3.bucket}")
     private String bucket;
 
-    @Value("${aws.s3.prefix:dev}")
-    private String localPrefix;
+    @Value("${aws.s3.prefix:}")
+    private String keyPrefix;
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    @Transactional
+    public void run(ApplicationArguments args) {
 
-        log.info("현재 S3 prefix = [{}]", localPrefix);
-
-        if (!"local".equals(localPrefix)) {
+        // local 환경에서만 실행
+        if (!"local".equals(keyPrefix)) {
             throw new IllegalStateException(
-                    "현재 S3 prefix: " + localPrefix
+                    "이미지 시더는 local 환경에서만 실행할 수 있습니다."
             );
         }
 
-        Resource[] images =
-                new PathMatchingResourcePatternResolver()
-                        .getResources("classpath*:seed/images/*.png");
-
-        int uploaded = 0;
+        int updated = 0;
         int skipped = 0;
 
-        for (Resource image : images) {
+        ListObjectsV2Request request = ListObjectsV2Request.builder()
+                .bucket(bucket)
+                .prefix(IMAGE_PREFIX)
+                .build();
 
-            String fileName = image.getFilename();
+        for (S3Object object : s3Client.listObjectsV2Paginator(request).contents()) {
 
-            if (fileName == null) {
+            String key = object.key();
+
+            // PNG 파일만 처리
+            if (!key.toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
                 skipped++;
                 continue;
             }
 
-            // "1 관리비.png" → "관리비"
-            String wordName = fileName
-                    .replaceFirst("^\\d+\\s+", "")
-                    .replaceFirst("(?i)\\.png$", "")
-                    .trim();
+            String wordName = key
+                    .substring(IMAGE_PREFIX.length())
+                    .replaceFirst("(?i)\\.png$", "");
 
-            Optional<Word> wordOptional =
-                    wordRepository.findByWord(wordName);
+            if (wordName.isBlank() || wordName.contains("/")) {
+                skipped++;
+                continue;
+            }
 
-            if (wordOptional.isEmpty()) {
+            Word word = wordRepository.findByWord(wordName)
+                    .orElse(null);
+
+            if (word == null) {
                 log.warn("DB에 없는 단어: {}", wordName);
                 skipped++;
                 continue;
             }
 
-            String relativeKey =
-                    "words/images/" + wordName + ".png";
+            // S3 업로드 없이 DB에 객체 키만 저장
+            word.updateImageUrl(key);
+            updated++;
 
-            String devKey = "local/" + relativeKey;
-            String prodKey = "prod/" + relativeKey;
-
-            byte[] bytes;
-            try (var input = image.getInputStream()) {
-                bytes = input.readAllBytes();
-            }
-
-            // 1. 로컬 S3
-            upload(devKey, bytes);
-
-            // 2. 배포 S3
-            upload(prodKey, bytes);
-
-            // 3. 로컬 DB에 dev 객체 키 저장
-            transactionTemplate.executeWithoutResult(status -> {
-                Word word = wordRepository.findByWord(wordName)
-                        .orElseThrow();
-
-                word.updateImageUrl(devKey);
-                wordRepository.save(word);
-            });
-
-            uploaded++;
-
-            log.info(
-                    "이미지 완료: {} / dev={} / prod={}",
-                    wordName, devKey, prodKey
-            );
+            log.info("이미지 키 설정: {} → {}", wordName, key);
         }
 
-        log.info("===== 이미지 시딩 완료 =====");
-        log.info("업로드 완료: {}개", uploaded);
-        log.info("건너뜀: {}개", skipped);
-    }
-
-    private void upload(String key, byte[] bytes) {
-
-        PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(key)
-                .contentType("image/png")
-                .build();
-
-        s3Client.putObject(
-                request,
-                RequestBody.fromBytes(bytes)
+        log.info(
+                "이미지 DB 시딩 완료: {}개, 건너뜀: {}개",
+                updated,
+                skipped
         );
     }
 }
