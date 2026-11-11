@@ -13,9 +13,7 @@ public record WordCandidate(
         String definition,
         String imageUrl,
         String wordAudioUrl,
-        String descriptionAudioUrl,
-        String wordAudioBase64,
-        String descriptionAudioBase64
+        String wordAudioBase64
 ) {
     public WordCandidate(
             String candidateId,
@@ -27,8 +25,7 @@ public record WordCandidate(
             double finalScore,
             String definition,
             String imageUrl,
-            String wordAudioUrl,
-            String descriptionAudioUrl
+            String wordAudioUrl
     ) {
         this(
                 candidateId,
@@ -41,8 +38,6 @@ public record WordCandidate(
                 definition,
                 imageUrl,
                 wordAudioUrl,
-                descriptionAudioUrl,
-                null,
                 null
         );
     }

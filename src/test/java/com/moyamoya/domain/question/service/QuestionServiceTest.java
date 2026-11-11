@@ -256,7 +256,6 @@ class QuestionServiceTest {
         ));
 
         Word existingWord = mock(Word.class);
-        when(existingWord.getDescriptionAudioAge3To4Url()).thenReturn("desc-key");
         when(existingWord.getWordAudioUrl()).thenReturn("word-key");
         when(existingWord.getId()).thenReturn(100L);
         when(existingWord.getSourceType()).thenReturn(WordSourceType.CURATED);
@@ -273,7 +272,7 @@ class QuestionServiceTest {
         when(candidateTtsService.resolveAudioUrl(any())).thenReturn("https://audio.example");
         org.mockito.Mockito.doThrow(new IllegalStateException("tts failed"))
                 .when(candidateTtsService)
-                .ensureStoredAudio(any(), any());
+                .ensureStoredAudio(any());
 
         assertThatThrownBy(() -> questionService.findSecondCandidates(
                 1L,

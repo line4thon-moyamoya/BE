@@ -126,7 +126,7 @@ class QuestionConfirmServiceTest {
         when(wordRepository.findByWord("적금")).thenReturn(Optional.of(existingWord));
         org.mockito.Mockito.doThrow(new IllegalStateException("tts failed"))
                 .when(candidateTtsService)
-                .ensureStoredAudio(any(), any());
+                .ensureStoredAudio(any());
 
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
                 1L,

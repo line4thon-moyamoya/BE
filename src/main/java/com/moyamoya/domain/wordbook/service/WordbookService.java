@@ -27,10 +27,10 @@ public class WordbookService {
         List<LearnedWordResponse> cards = learnedWordRepository.findAllWithWordByChildId(childId)
                 .stream()
                 .map(learnedWord -> {
-                    String imageUrl = learnedWord.getWord().getImageUrl();
-                    String imagePresignedUrl = imageUrl == null
+                    String imageKey = learnedWord.getWord().getImageUrl();
+                    String imagePresignedUrl = imageKey == null
                             ? null
-                            : s3Service.getPresignedUrl(imageUrl);
+                            : s3Service.getPresignedUrl(imageKey);
                     return LearnedWordResponse.from(learnedWord, imagePresignedUrl);
                 })
                 .toList();

@@ -160,7 +160,7 @@ class SongDetailServiceTest {
 
     private Word word(String name, String age3To4, String age5, String image) {
         return Word.createExternal(name, "기본 정의", null, age3To4, age5,
-                null, null, null, image, null, null, null);
+                null, null, null, image, null);
     }
 
     private void error(String code, Long userId, Long childId, Long songId) {

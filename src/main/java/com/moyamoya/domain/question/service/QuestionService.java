@@ -160,8 +160,7 @@ public class QuestionService {
             List<WordCandidate> candidatesWithTts;
             try {
                 candidatesWithTts = enrichCandidatesWithTts(
-                        enrichedCandidates,
-                        session.getChildId()
+                        enrichedCandidates
                 );
             } catch (RuntimeException e) {
                 throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
@@ -249,8 +248,7 @@ public class QuestionService {
         List<WordCandidate> candidatesWithTts;
         try {
             candidatesWithTts = enrichCandidatesWithTts(
-                    enrichedCandidates,
-                    childId
+                    enrichedCandidates
             );
             session.setFirstCandidates(candidatesWithTts);
         } catch (IllegalArgumentException exception) {
@@ -332,10 +330,6 @@ public class QuestionService {
                             ? word.getDescAge3To4()
                             : word.getDescAge5();
 
-                    String descriptionAudioUrl = ageGroup == AgeGroup.AGE_3_4
-                            ? word.getDescriptionAudioAge3To4Url()
-                            : word.getDescriptionAudioAge5Url();
-
                     String resolvedDescription = hasText(ageDescription)
                             ? ageDescription
                             : (word.getDefinition() != null ? word.getDefinition() : candidate.definition());
@@ -350,19 +344,15 @@ public class QuestionService {
                             candidate.finalScore(),
                             resolvedDescription,
                             word.getImageUrl() != null ? word.getImageUrl() : candidate.imageUrl(),
-                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
-                            descriptionAudioUrl != null ? descriptionAudioUrl : candidate.descriptionAudioUrl()
+                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl()
                     );
                 })
                 .toList();
     }
 
     private List<WordCandidate> enrichCandidatesWithTts(
-            List<WordCandidate> candidates,
-            Long childId
+            List<WordCandidate> candidates
     ) {
-        AgeGroup ageGroup = resolveChildAgeGroup(childId);
-
         return candidates.stream()
                 .map(candidate -> {
                     Word existingWord = wordRepository
@@ -370,24 +360,11 @@ public class QuestionService {
                             .orElse(null);
 
                     if (existingWord != null) {
-                        candidateTtsService.ensureStoredAudio(
-                                existingWord,
-                                ageGroup
-                        );
-
-                        String descriptionKey =
-                                ageGroup == AgeGroup.AGE_3_4
-                                        ? existingWord.getDescriptionAudioAge3To4Url()
-                                        : existingWord.getDescriptionAudioAge5Url();
+                        candidateTtsService.ensureStoredAudio(existingWord);
 
                         String wordAudioUrl =
                                 candidateTtsService.resolveAudioUrl(
                                         existingWord.getWordAudioUrl()
-                                );
-
-                        String descriptionAudioUrl =
-                                candidateTtsService.resolveAudioUrl(
-                                        descriptionKey
                                 );
                         String imageUrl =
                                 candidateTtsService.resolvePresignedUrl(
@@ -405,8 +382,6 @@ public class QuestionService {
                                 candidate.definition(),
                                 imageUrl,
                                 wordAudioUrl,
-                                descriptionAudioUrl,
-                                null,
                                 null
                         );
                     }
@@ -414,12 +389,6 @@ public class QuestionService {
                     String wordAudioBase64 =
                             candidateTtsService.generateBase64IfNeeded(
                                     candidate.word(),
-                                    null
-                            );
-
-                    String descriptionAudioBase64 =
-                            candidateTtsService.generateBase64IfNeeded(
-                                    candidate.definition(),
                                     null
                             );
 
@@ -434,9 +403,7 @@ public class QuestionService {
                             candidate.definition(),
                             candidate.imageUrl(),
                             null,
-                            null,
-                            wordAudioBase64,
-                            descriptionAudioBase64
+                            wordAudioBase64
                     );
                 })
                 .toList();

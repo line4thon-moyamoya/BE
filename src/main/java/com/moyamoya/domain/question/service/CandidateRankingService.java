@@ -530,7 +530,6 @@ public class CandidateRankingService {
                 score,
                 data.definition(),
                 null,
-                null,
                 null
         );
     }
@@ -560,7 +559,6 @@ public class CandidateRankingService {
                 combinedContextScore,
                 scored.finalScore(),
                 data.definition(),
-                null,
                 null,
                 null
         );

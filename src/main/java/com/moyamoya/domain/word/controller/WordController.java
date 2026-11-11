@@ -29,7 +29,7 @@ public class WordController {
     private static final String SUCCESS_EXAMPLE = """
             {"success": true, "code": 200, "message": "단어 정보를 조회했습니다.",
              "data": {"wordId": 1, "word": "적금", "description": "적금은 돈을 조금씩 모으는 거야.",
-                      "descriptionAudioUrl": "https://example.com/audio/1-desc.wav"}}
+                      "wordAudioUrl": "https://example.com/audio/1-word.wav"}}
             """;
     private static final String INVALID_WORD_EXAMPLE = """
             {"success": false, "code": "WORD400", "message": "올바른 단어 ID를 입력해 주세요.", "data": null}
@@ -56,7 +56,7 @@ public class WordController {
     private final WordService wordService;
 
     @Operation(summary = "아이 연령별 단어 설명 조회",
-            description = "아이 연령에 맞는 단어 설명과 설명 음성 URL을 조회합니다.",
+            description = "아이 연령에 맞는 단어 설명과 단어 발음 음성 URL을 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "단어 설명 조회 성공",

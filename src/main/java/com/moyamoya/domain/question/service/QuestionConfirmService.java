@@ -93,10 +93,7 @@ public class QuestionConfirmService {
                 // 음성이 없는 경우 S3 저장
                 // 기존 단어는 이미 저장된 음성 재사용
                 try {
-                    candidateTtsService.ensureStoredAudio(
-                            word,
-                            child.getAgeGroup()
-                    );
+                    candidateTtsService.ensureStoredAudio(word);
                 } catch (IllegalArgumentException | IllegalStateException e) {
                     throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
                 }
@@ -109,21 +106,11 @@ public class QuestionConfirmService {
                 );
                 questionHistoryRepository.save(history);
 
-                boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
-                String descriptionKey = age3To4
-                        ? word.getDescriptionAudioAge3To4Url()
-                        : word.getDescriptionAudioAge5Url();
-
                 String wordAudioUrl;
-                String descriptionAudioUrl;
                 String imageUrl;
                 try {
                     wordAudioUrl = candidateTtsService.resolveAudioUrl(
                             word.getWordAudioUrl()
-                    );
-
-                    descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
-                            descriptionKey
                     );
 
                     imageUrl = candidateTtsService.resolvePresignedUrl(
@@ -140,7 +127,6 @@ public class QuestionConfirmService {
                         candidate.definition(),
                         imageUrl,
                         wordAudioUrl,
-                        descriptionAudioUrl,
                         "WORD_LEARNING"
                 );
             });
@@ -183,14 +169,7 @@ public class QuestionConfirmService {
         // 후보 단계에서 만든 Base64를 재사용해 S3 업로드
         String wordKey = uploadCandidateAudio(
                 candidate.wordAudioBase64(),
-                "word",
-                candidate.word()
-        );
-
-        String descriptionKey = uploadCandidateAudio(
-                candidate.descriptionAudioBase64(),
-                age3To4 ? "desc-age-3-4" : "desc-age-5",
-                candidate.word()
+                "word"
         );
 
         // 현재 후보에 없는 상세 메타데이터는 임시로 null 처리
@@ -205,9 +184,7 @@ public class QuestionConfirmService {
                 null,
                 null,
                 candidate.imageUrl(),
-                wordKey,
-                age3To4 ? descriptionKey : null,
-                age3To4 ? null : descriptionKey
+                wordKey
         );
 
         return wordRepository.save(newWord);
@@ -216,8 +193,7 @@ public class QuestionConfirmService {
     // Base64 WAV를 S3에 업로드하고 객체 키 반환
     private String uploadCandidateAudio(
             String audioBase64,
-            String type,
-            String word
+            String type
     ) {
         if (!StringUtils.hasText(audioBase64)) {
             return null;

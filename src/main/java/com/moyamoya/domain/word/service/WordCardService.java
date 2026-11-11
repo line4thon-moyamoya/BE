@@ -20,6 +20,6 @@ public class WordCardService {
                 ? null
                 : s3Service.getPresignedUrl(lookup.imageUrl());
         return new WordCardDetailResponse(lookup.learnedWordId(), description.wordId(), description.word(),
-                description.description(), imageUrl, description.descriptionAudioUrl());
+                description.description(), imageUrl, description.wordAudioUrl());
     }
 }

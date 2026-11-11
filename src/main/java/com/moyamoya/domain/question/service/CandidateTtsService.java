@@ -1,6 +1,5 @@
 package com.moyamoya.domain.question.service;
 
-import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.s3.S3Service;
@@ -36,7 +35,7 @@ public class CandidateTtsService {
     }
 
     // DB에 존재하는 단어의 음성을 S3에 저장
-    public void ensureStoredAudio(Word word, AgeGroup ageGroup) {
+    public void ensureStoredAudio(Word word) {
 
         // 1. 단어 발음 음성이 없으면 생성 후 업로드
         if (!StringUtils.hasText(word.getWordAudioUrl())) {
@@ -49,41 +48,7 @@ public class CandidateTtsService {
             word.updateWordAudioUrl(uploadKey);
         }
 
-        // 2. 현재 아이 연령대에 해당하는 설명 음성만 생성
-        boolean age3To4 = ageGroup == AgeGroup.AGE_3_4;
-
-        String description = age3To4
-                ? word.getDescAge3To4()
-                : word.getDescAge5();
-
-        String existingKey = age3To4
-                ? word.getDescriptionAudioAge3To4Url()
-                : word.getDescriptionAudioAge5Url();
-
-        // 연령별 설명이 없다면 기본 정의 사용
-        if (!StringUtils.hasText(description)) {
-            description = word.getDefinition();
-        }
-
-        if (!StringUtils.hasText(existingKey)
-                && StringUtils.hasText(description)) {
-
-            byte[] wav = moyaTtsService.synthesize(description);
-
-            String key = age3To4
-                    ? "words/audio/" + word.getId() + "/desc-age-3-4.wav"
-                    : "words/audio/" + word.getId() + "/desc-age-5.wav";
-
-            String uploadKey = s3Service.uploadWav(key, wav);
-
-            if (age3To4) {
-                word.updateDescriptionAudioAge3To4Url(uploadKey);
-            } else {
-                word.updateDescriptionAudioAge5Url(uploadKey);
-            }
-        }
-
-        // 3. 변경된 S3 객체 키를 MySQL에 저장
+        // 변경된 S3 객체 키를 MySQL에 저장
         wordRepository.save(word);
     }
 

@@ -54,12 +54,6 @@ public class Word extends BaseTimeEntity {
     @Column(name = "word_audio_url", length = 500)
     private String wordAudioUrl;
 
-    @Column(name = "description_audio_age_3_4_url", length = 500)
-    private String descriptionAudioAge3To4Url;
-
-    @Column(name = "description_audio_age_5_url", length = 500)
-    private String descriptionAudioAge5Url;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false, length = 20)
     private WordSourceType sourceType;
@@ -77,9 +71,7 @@ public class Word extends BaseTimeEntity {
             String hint,
             HeardFrom heardFrom,
             String imageUrl,
-            String wordAudioUrl,
-            String descriptionAudioAge3To4Url,
-            String descriptionAudioAge5Url
+            String wordAudioUrl
     ) {
         Word newWord = new Word();
 
@@ -93,8 +85,6 @@ public class Word extends BaseTimeEntity {
         newWord.heardFrom = heardFrom;
         newWord.imageUrl = imageUrl;
         newWord.wordAudioUrl = wordAudioUrl;
-        newWord.descriptionAudioAge3To4Url = descriptionAudioAge3To4Url;
-        newWord.descriptionAudioAge5Url = descriptionAudioAge5Url;
 
         newWord.sourceType = WordSourceType.EXTERNAL;
 
@@ -129,8 +119,6 @@ public class Word extends BaseTimeEntity {
         // 음성 및 이미지는 추후 생성
         newWord.imageUrl = null;
         newWord.wordAudioUrl = null;
-        newWord.descriptionAudioAge3To4Url = null;
-        newWord.descriptionAudioAge5Url = null;
 
         return newWord;
     }
@@ -138,16 +126,6 @@ public class Word extends BaseTimeEntity {
     // 단어 발음 음성의 S3 객체 키 저장
     public void updateWordAudioUrl(String s3Key) {
         this.wordAudioUrl = s3Key;
-    }
-
-    // 3~4세 설명 음성의 S3 객체 키 저장
-    public void updateDescriptionAudioAge3To4Url(String s3Key) {
-        this.descriptionAudioAge3To4Url = s3Key;
-    }
-
-    // 5세 이상 설명 음성의 S3 객체 키 저장
-    public void updateDescriptionAudioAge5Url(String s3Key) {
-        this.descriptionAudioAge5Url = s3Key;
     }
 
     // 단어 이미지의 S3 객체 키 저장

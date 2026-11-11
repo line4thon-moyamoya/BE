@@ -55,3 +55,8 @@ tts:
 song:
   mixing:
     processor-read-timeout-ms: ${SONG_MIX_READ_TIMEOUT_MS:65000}
+
+dictionary:
+  stdict:
+    base-url: https://stdict.korean.go.kr/api
+    key: ${STDICT_API_KEY}
