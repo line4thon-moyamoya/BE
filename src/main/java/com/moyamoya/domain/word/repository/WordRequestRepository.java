@@ -12,14 +12,12 @@ public interface WordRequestRepository
 
     List<WordRequest> findByChildIdOrderByCreatedAtDesc(Long childId);
 
-    // 이번 주 전체 요청 수 (해결 여부 무관)
     long countByChildIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             Long childId,
             LocalDateTime start,
             LocalDateTime end
     );
 
-    // 이번 주 미해결 요청 수
     long countByChildIdAndStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             Long childId,
             WordRequestStatus status,
@@ -27,15 +25,21 @@ public interface WordRequestRepository
             LocalDateTime end
     );
 
-    // 전체 기간 미해결 요청 수
     long countByChildIdAndStatus(
             Long childId,
             WordRequestStatus status
     );
 
-    // 전체 기간 미해결 요청 최신 3개
     List<WordRequest> findTop3ByChildIdAndStatusOrderByCreatedAtDesc(
             Long childId,
             WordRequestStatus status
+    );
+
+    // PENDING과 RESOLVED 모두 가져옴
+    List<WordRequest>
+    findByChildIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAscIdAsc(
+            Long childId,
+            LocalDateTime start,
+            LocalDateTime end
     );
 }
