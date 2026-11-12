@@ -26,7 +26,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QuestionConfirmServiceTest {
@@ -38,6 +41,7 @@ class QuestionConfirmServiceTest {
     private CandidateTtsService candidateTtsService;
     private S3Service s3Service;
     private TransactionTemplate transactionTemplate;
+    private WordDescriptionService wordDescriptionService;
 
     private QuestionConfirmService questionConfirmService;
 
@@ -51,9 +55,13 @@ class QuestionConfirmServiceTest {
         s3Service = mock(S3Service.class);
         transactionTemplate = mock(TransactionTemplate.class);
 
+        // 신규 추가: 연령별 설명 생성 서비스
+        wordDescriptionService = mock(WordDescriptionService.class);
+
         when(transactionTemplate.execute(any()))
                 .thenAnswer(invocation ->
-                        ((TransactionCallback<?>) invocation.getArgument(0)).doInTransaction(null)
+                        ((TransactionCallback<?>) invocation.getArgument(0))
+                                .doInTransaction(null)
                 );
 
         questionConfirmService = new QuestionConfirmService(
@@ -63,7 +71,8 @@ class QuestionConfirmServiceTest {
                 questionHistoryRepository,
                 candidateTtsService,
                 s3Service,
-                transactionTemplate
+                transactionTemplate,
+                wordDescriptionService
         );
     }
 
@@ -141,6 +150,74 @@ class QuestionConfirmServiceTest {
     }
 
     @Test
+    void confirmWordShouldGenerateOnlyCurrentAgeDescription() {
+        QuestionSession session =
+                QuestionSession.create(1L, "자외선이 뭐야?", null);
+
+        session.setExtractionResult("자외선", List.of("자외선"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "EXTERNAL:자외선",
+                null,
+                "자외선",
+                WordSourceType.EXTERNAL,
+                1.0,
+                0.0,
+                1.0,
+                "눈에 보이지 않는 빛의 한 종류",
+                null,
+                null,
+                null,
+                null
+        )));
+
+        Word word = Word.createExternal(
+                "자외선",
+                "눈에 보이지 않는 빛의 한 종류",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        when(sessionStore.find(session.getSessionId()))
+                .thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
+        stubChildOwnership(1L, 1L);
+        when(wordRepository.findByWord("자외선"))
+                .thenReturn(Optional.of(word));
+        when(wordDescriptionService.generate(
+                "자외선",
+                "눈에 보이지 않는 빛의 한 종류",
+                AgeGroup.AGE_5
+        )).thenReturn("햇빛 속에 있는 눈에 보이지 않는 빛이야.");
+
+        questionConfirmService.confirmWord(
+                1L,
+                session.getSessionId().toString(),
+                "c_001"
+        );
+
+        verify(wordDescriptionService).generate(
+                "자외선",
+                "눈에 보이지 않는 빛의 한 종류",
+                AgeGroup.AGE_5
+        );
+        verify(wordDescriptionService, never()).generate(
+                eq("자외선"),
+                eq("눈에 보이지 않는 빛의 한 종류"),
+                eq(AgeGroup.AGE_3_4)
+        );
+
+        assertThat(word.getDescAge5())
+                .isEqualTo("햇빛 속에 있는 눈에 보이지 않는 빛이야.");
+        assertThat(word.getDescAge3To4()).isNull();
+    }
+
+    @Test
     void confirmWordSavesQuestionHistory() {
         QuestionSession session =
                 QuestionSession.create(1L, "적금이 뭐야", null);
@@ -183,7 +260,7 @@ class QuestionConfirmServiceTest {
                 .isEqualTo(QuestionSessionStatus.CONFIRMED);
         assertThat(response.imageUrl()).isEqualTo("https://image.example/10.png");
 
-        org.mockito.Mockito.verify(questionHistoryRepository)
+        verify(questionHistoryRepository)
                 .save(any());
     }
 

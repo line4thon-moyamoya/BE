@@ -38,6 +38,7 @@ class QuestionServiceTest {
 
     private QuestionTargetExtractor targetExtractor;
     private JosaCandidateGenerator josaGenerator;
+    private CandidateSearchService candidateSearchService;
     private CandidateRankingService rankingService;
     private SttService sttService;
     private CandidateTtsService candidateTtsService;
@@ -48,15 +49,21 @@ class QuestionServiceTest {
     private UserRepository userRepository;
     private QuestionAudioTempService audioTempService;
     private QuestionService questionService;
+    private WordDescriptionService wordDescriptionService;
 
     @BeforeEach
     void setUp() {
         targetExtractor = mock(QuestionTargetExtractor.class);
         josaGenerator = mock(JosaCandidateGenerator.class);
+        candidateSearchService = mock(CandidateSearchService.class);
         rankingService = mock(CandidateRankingService.class);
         sttService = mock(SttService.class);
         candidateTtsService = mock(CandidateTtsService.class);
         moyaTtsService = mock(MoyaTtsService.class);
+
+        // 신규 추가: 연령별 쉬운 설명 생성 서비스
+        wordDescriptionService = mock(WordDescriptionService.class);
+
         sessionStore = mock(QuestionSessionStore.class);
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
@@ -66,10 +73,12 @@ class QuestionServiceTest {
         questionService = new QuestionService(
                 targetExtractor,
                 josaGenerator,
+                candidateSearchService,
                 rankingService,
                 sttService,
                 candidateTtsService,
                 moyaTtsService,
+                wordDescriptionService,
                 sessionStore,
                 wordRepository,
                 childRepository,
@@ -87,7 +96,7 @@ class QuestionServiceTest {
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
         when(josaGenerator.generate("데금이"))
                 .thenReturn(List.of("데금이", "데금"));
-        when(rankingService.rankFirst(List.of("데금이", "데금")))
+        when(candidateSearchService.searchFirstCandidates(List.of("데금이", "데금")))
                 .thenReturn(List.of(new WordCandidate(
                         "CURATED:세금",
                         null,
@@ -172,13 +181,18 @@ class QuestionServiceTest {
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,
                 Set.of("CURATED:적금")
         )).thenReturn(secondCandidates);
         when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+        when(wordDescriptionService.generate(
+                "연금",
+                "정의2",
+                AgeGroup.AGE_3_4
+        )).thenReturn("나중에 쓸 돈을 조금씩 받는 거야.");
 
         var response = questionService.findSecondCandidates(
                 1L,
@@ -191,6 +205,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
         assertThat(response.dialogue()).isNotNull();
         assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
+        assertThat(response.candidates().getFirst().description())
+                .isEqualTo("나중에 쓸 돈을 조금씩 받는 거야.");
     }
 
     @Test
@@ -199,7 +215,7 @@ class QuestionServiceTest {
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
         when(josaGenerator.generate("데금이"))
                 .thenReturn(List.of("데금이", "데금"));
-        when(rankingService.rankFirst(List.of("데금이", "데금")))
+        when(candidateSearchService.searchFirstCandidates(List.of("데금이", "데금")))
                 .thenReturn(List.of(new WordCandidate(
                         "CURATED:세금",
                         null,
@@ -209,6 +225,7 @@ class QuestionServiceTest {
                         0.0,
                         0.92,
                         "기존정의",
+                        null,
                         null,
                         null,
                         null
@@ -267,7 +284,7 @@ class QuestionServiceTest {
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,
@@ -325,7 +342,7 @@ class QuestionServiceTest {
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,

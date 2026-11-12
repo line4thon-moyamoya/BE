@@ -14,11 +14,16 @@ public record CandidateResponse(
         String wordAudioContentType
 ) {
     public static CandidateResponse from(WordCandidate candidate) {
+        String description = candidate.easyDescription() != null
+                && !candidate.easyDescription().isBlank()
+                ? candidate.easyDescription()
+                : null;
+
         return new CandidateResponse(
                 candidate.candidateId(),
                 candidate.wordId(),
                 candidate.word(),
-                candidate.definition(),
+                description,
                 candidate.imageUrl(),
                 candidate.wordAudioUrl(),
                 candidate.wordAudioBase64(),

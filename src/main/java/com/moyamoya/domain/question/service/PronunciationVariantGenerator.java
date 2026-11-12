@@ -61,6 +61,26 @@ public class PronunciationVariantGenerator {
             String priority
     ) {}
 
+    // F1 표현에서 신규 사전 검색용 후보 생성 - MVP: 기존 규칙을 1회만 적용하고 검색량을 제한
+    public List<String> generateDictionaryQueries(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return List.of();
+        }
+
+        String original = expression.trim();
+        LinkedHashSet<String> queries = new LinkedHashSet<>();
+        queries.add(original);
+
+        for (PronunciationVariant variant : generateDetailed(original)) {
+            queries.add(variant.pronunciation());
+            if (queries.size() >= 10) {
+                break;
+            }
+        }
+
+        return new ArrayList<>(queries);
+    }
+
     // 규칙별 예상 발음 생성 (원본은 포함하지 않음)
     public List<PronunciationVariant> generateDetailed(String word) {
         if (word == null || word.isBlank()) {

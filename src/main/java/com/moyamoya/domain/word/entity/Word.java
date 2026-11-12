@@ -130,4 +130,23 @@ public class Word extends BaseTimeEntity {
 
     // 단어 이미지의 S3 객체 키 저장
     public void updateImageUrl(String s3Key) { this.imageUrl = s3Key; }
+
+
+    public void fillMissingDescriptions(
+            String descriptionAge3To4,
+            String descriptionAge5
+    ) {
+        // 기존 설명이 없을 때만 저장
+        if ((this.descAge3To4 == null || this.descAge3To4.isBlank())
+                && descriptionAge3To4 != null
+                && !descriptionAge3To4.isBlank()) {
+            this.descAge3To4 = descriptionAge3To4;
+        }
+
+        if ((this.descAge5 == null || this.descAge5.isBlank())
+                && descriptionAge5 != null
+                && !descriptionAge5.isBlank()) {
+            this.descAge5 = descriptionAge5;
+        }
+    }
 }

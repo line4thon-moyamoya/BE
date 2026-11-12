@@ -350,7 +350,8 @@ public class QuestionSession {
                         candidate.imageUrl(),
                         candidate.wordAudioUrl(),
                         candidate.wordAudioBase64(),
-                        candidate.wordAudioContentType()
+                        candidate.wordAudioContentType(),
+                        candidate.easyDescription()
                 ))
                 .toList();
     }

@@ -285,6 +285,57 @@ public class CandidateRankingService {
                 .toList();
     }
 
+    public double calculateExternalPronunciationScore(
+            List<String> targetExpressions,
+            String word
+    ) {
+        if (word == null || word.isBlank()) {
+            return 0.0;
+        }
+
+        List<String> expressions = normalizeExpressions(targetExpressions);
+        if (expressions.isEmpty()) {
+            return 0.0;
+        }
+
+        QuestionWordData data = new QuestionWordData(
+                word,
+                word,
+                null,
+                null,
+                null,
+                null,
+                null,
+                word,
+                word,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        return calculateBestMatch(expressions, data).score();
+    }
+
+    public boolean containsCsvWord(String word) {
+        if (word == null || word.isBlank()) {
+            return false;
+        }
+
+        String normalized = word.trim();
+        return dataLoader.getWords().stream()
+                .map(QuestionWordData::word)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .anyMatch(candidate -> candidate.equalsIgnoreCase(normalized));
+    }
+
+    public List<QuestionWordData> getWords() {
+        return List.copyOf(dataLoader.getWords());
+    }
+
     // 원본과 조사 제거형 정리
     private List<String> normalizeExpressions(
             List<String> targetExpressions
