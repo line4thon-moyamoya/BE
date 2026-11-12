@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.AdditionalMatchers.aryEq;
 
-import com.moyamoya.domain.question.service.MoyaTtsService;
 import com.moyamoya.domain.song.model.SongAudioPlacement;
 import com.moyamoya.domain.song.dto.response.SongMixResponse;
 import java.util.List;
@@ -12,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class SongMixingServiceTest {
-    private final MoyaTtsService tts = mock(MoyaTtsService.class);
+    private final SongTtsService tts = mock(SongTtsService.class);
     private final PythonSongMixerClient mixer = mock(PythonSongMixerClient.class);
     private final List<String> words = List.of("적금", "금", "적금", "금", "적금");
 

@@ -1,6 +1,5 @@
 package com.moyamoya.domain.song.service;
 
-import com.moyamoya.domain.question.service.MoyaTtsService;
 import com.moyamoya.domain.song.dto.response.SongMixResponse;
 import com.moyamoya.domain.song.model.SongAudioPlacement;
 import java.util.ArrayList;
@@ -13,13 +12,13 @@ public class SongMixingService {
     private static final int MAX_VOICE_BYTES = 10 * 1024 * 1024;
     private static final long MAX_TOTAL_BYTES = 50L * 1024 * 1024;
     private final SongSpeechPlanner planner;
-    private final MoyaTtsService ttsService;
+    private final SongTtsService ttsService;
     private final PythonSongMixerClient mixerClient;
     private final SongAudioStorageService storage;
 
     public SongMixingService(
             SongSpeechPlanner planner,
-            MoyaTtsService ttsService,
+            SongTtsService ttsService,
             PythonSongMixerClient mixerClient,
             SongAudioStorageService storage
     ) {
