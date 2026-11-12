@@ -14,10 +14,11 @@ public record CandidateResponse(
         String wordAudioContentType
 ) {
     public static CandidateResponse from(WordCandidate candidate) {
+        // 쉬운 설명이 없으면 사전 정의를 대신 사용
         String description = candidate.easyDescription() != null
                 && !candidate.easyDescription().isBlank()
                 ? candidate.easyDescription()
-                : null;
+                : candidate.definition();
 
         return new CandidateResponse(
                 candidate.candidateId(),

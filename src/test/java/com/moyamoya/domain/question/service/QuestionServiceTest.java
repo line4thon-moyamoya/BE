@@ -130,6 +130,8 @@ class QuestionServiceTest {
                 "words/images/42.png"
         )).thenReturn("https://image.example/42.png");
         when(wordRepository.findByWord("세금")).thenReturn(Optional.of(word));
+        when(candidateTtsService.ensureStoredAudio(word))
+                .thenReturn("words/audio/42/word.wav");
 
         var response = questionService.testStt(1L, "엄마, 데금이 뭐야?");
 

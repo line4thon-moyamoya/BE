@@ -25,6 +25,7 @@ public class WeeklyReportScheduler {
     private final WeeklyReportService weeklyReportService;
 
     @Scheduled(cron = "0 10 0 * * MON", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 10 1 * * *", zone = "Asia/Seoul")    // 매일 01:10 누락된 리포트 보충
     public void generateLastWeekReports() {
 
         LocalDateTime snapshotAt = LocalDateTime.now(APP_ZONE);

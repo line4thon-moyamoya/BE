@@ -59,12 +59,15 @@ class WordLookupTransactionTest {
         } else {
             when(words.findById(1L)).thenReturn(Optional.of(word));
         }
-        doAnswer(invocation -> {
-            assertThat(transactions.events).containsExactly("read begin", "commit", "write begin");
-            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
-            ReflectionTestUtils.setField(word, "wordAudioUrl", "word.wav");
-            return null;
-        }).when(tts).ensureStoredAudio(word);
+        when(tts.ensureStoredAudio(word)).thenAnswer(invocation -> {
+            assertThat(transactions.events)
+                    .containsExactly("read begin", "commit", "write begin");
+
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                    .isTrue();
+
+            return "word.wav";
+        });
         when(tts.resolveAudioUrl("word.wav")).thenReturn("https://audio.test/word.wav");
         when(s3Service.getPresignedUrl("image.png"))
                 .thenReturn("https://s3.test/presigned/image.png");

@@ -4,6 +4,7 @@ import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -11,8 +12,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -39,35 +42,50 @@ class WeeklyReportSchedulerTest {
 
         scheduler.generateLastWeekReports();
 
-        // 아이 3명 모두 생성 호출
-        verify(weeklyReportService, times(3))
-                .generate(
-                        any(Child.class),
-                        any(LocalDate.class),
-                        any(LocalDateTime.class)
-                );
+        ArgumentCaptor<LocalDate> dateCaptor =
+                ArgumentCaptor.forClass(LocalDate.class);
 
-        // 지난주 월요일 날짜가 전달되었는지 확인
-        LocalDate expectedWeekStart = LocalDate.now()
-                .with(DayOfWeek.MONDAY)
+        ArgumentCaptor<LocalDateTime> snapshotCaptor =
+                ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(weeklyReportService, times(3)).generate(
+                any(Child.class),
+                dateCaptor.capture(),
+                snapshotCaptor.capture()
+        );
+
+        List<LocalDate> dates = dateCaptor.getAllValues();
+        List<LocalDateTime> snapshots = snapshotCaptor.getAllValues();
+
+        // 스케줄러에서 사용한 스냅샷 시각을 기준으로 날짜 계산
+        LocalDate expectedWeekStart = snapshots.get(0)
+                .toLocalDate()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                 .minusWeeks(1);
+
+        // 모든 아이에게 동일한 주차와 스냅샷 시각 전달
+        assertThat(dates)
+                .containsOnly(expectedWeekStart);
+
+        assertThat(snapshots)
+                .containsOnly(snapshots.get(0));
 
         verify(weeklyReportService).generate(
                 eq(child1),
                 eq(expectedWeekStart),
-                any(LocalDateTime.class)
+                eq(snapshots.get(0))
         );
 
         verify(weeklyReportService).generate(
                 eq(child2),
                 eq(expectedWeekStart),
-                any(LocalDateTime.class)
+                eq(snapshots.get(0))
         );
 
         verify(weeklyReportService).generate(
                 eq(child3),
                 eq(expectedWeekStart),
-                any(LocalDateTime.class)
+                eq(snapshots.get(0))
         );
     }
 

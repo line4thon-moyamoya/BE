@@ -379,16 +379,16 @@ public class QuestionService {
                            .orElse(null);
 
                     if (existingWord != null) {
-                       candidateTtsService.ensureStoredAudio(existingWord);
+                        String audioKey =
+                                candidateTtsService.ensureStoredAudio(existingWord);
 
-                       String wordAudioUrl =
-                               candidateTtsService.resolveAudioUrl(
-                                       existingWord.getWordAudioUrl()
-                               );
-                       String imageUrl =
-                               candidateTtsService.resolvePresignedUrl(
-                                       existingWord.getImageUrl()
-                               );
+                        String wordAudioUrl =
+                                candidateTtsService.resolveAudioUrl(audioKey);
+
+                        String imageUrl =
+                                candidateTtsService.resolvePresignedUrl(
+                                        existingWord.getImageUrl()
+                                );
 
                        return candidate.withMedia(
                                existingWord.getId(),

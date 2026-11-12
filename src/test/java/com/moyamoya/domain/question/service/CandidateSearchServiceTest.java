@@ -45,9 +45,7 @@ class CandidateSearchServiceTest {
                 rankingService,
                 wordRepository,
                 dictionaryService,
-                new PronunciationVariantGenerator(loader),
-                new PronunciationSimilarity(),
-                new ContextScoringService()
+                new PronunciationVariantGenerator(loader)
         );
     }
 

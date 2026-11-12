@@ -21,11 +21,22 @@ public class WordDescriptionAudioService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public WordDescriptionResponse resolve(Word word, AgeGroup ageGroup) {
         String description = description(word, ageGroup);
-        if (!StringUtils.hasText(word.getWordAudioUrl())) {
-            candidateTtsService.ensureStoredAudio(word);
+
+        String audioKey = word.getWordAudioUrl();
+
+        if (!StringUtils.hasText(audioKey)) {
+            audioKey = candidateTtsService.ensureStoredAudio(word);
         }
-        String wordAudioUrl = candidateTtsService.resolveAudioUrl(word.getWordAudioUrl());
-        return new WordDescriptionResponse(word.getId(), word.getWord(), description, wordAudioUrl);
+
+        String wordAudioUrl =
+                candidateTtsService.resolveAudioUrl(audioKey);
+
+        return new WordDescriptionResponse(
+                word.getId(),
+                word.getWord(),
+                description,
+                wordAudioUrl
+        );
     }
 
     private String description(Word word, AgeGroup ageGroup) {

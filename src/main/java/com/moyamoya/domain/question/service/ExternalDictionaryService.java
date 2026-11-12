@@ -6,6 +6,7 @@ import com.moyamoya.domain.question.model.DictionaryEntry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -36,7 +37,19 @@ public class ExternalDictionaryService {
         this.objectMapper = objectMapper;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
         this.apiKey = apiKey;
-        this.restClient = RestClient.builder().build();
+
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+
+        // 서버 연결 대기 최대 3초
+        requestFactory.setConnectTimeout(3000);
+
+        // 응답 데이터 대기 최대 5초
+        requestFactory.setReadTimeout(5000);
+
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 
 

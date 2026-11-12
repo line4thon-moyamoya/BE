@@ -73,17 +73,15 @@ class WordDescriptionAudioServiceTest {
     @Test
     void generatesWordAudioWhenMissing() {
         Word word = word("설명", "설명", "기본 뜻", null);
-        doAnswer(invocation -> {
-            word.updateWordAudioUrl("dev/word.wav");
-            return null;
-        }).when(candidateTtsService).ensureStoredAudio(word);
+        when(candidateTtsService.ensureStoredAudio(word))
+                .thenReturn("dev/word.wav");
         when(candidateTtsService.resolveAudioUrl("dev/word.wav"))
                 .thenReturn("https://audio.test/word.wav");
-
         var result = service.resolve(word, AgeGroup.AGE_5);
-
-        assertThat(result.wordAudioUrl()).isEqualTo("https://audio.test/word.wav");
+        assertThat(result.wordAudioUrl())
+                .isEqualTo("https://audio.test/word.wav");
         verify(candidateTtsService).ensureStoredAudio(word);
+        verify(candidateTtsService).resolveAudioUrl("dev/word.wav");
     }
 
     @Test

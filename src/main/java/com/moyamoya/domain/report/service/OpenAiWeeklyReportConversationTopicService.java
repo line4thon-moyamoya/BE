@@ -138,7 +138,12 @@ public class OpenAiWeeklyReportConversationTopicService
         // 질문을 감싸는 큰따옴표 제거
         normalized = normalized.replace("\"", "");
 
-        if (normalized.isBlank()) {
+        // 질문은 반드시 하나만 허용
+        long questionCount = normalized.chars()
+                .filter(ch -> ch == '?')
+                .count();
+
+        if (questionCount != 1) {
             return null;
         }
 

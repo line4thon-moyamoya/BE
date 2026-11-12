@@ -100,10 +100,14 @@ public class QuestionConfirmService {
 
                 // 음성이 없는 경우 S3 저장
                 // 기존 단어는 이미 저장된 음성 재사용
+                String audioKey;
+
                 try {
-                    candidateTtsService.ensureStoredAudio(word);
+                    audioKey = candidateTtsService.ensureStoredAudio(word);
                 } catch (IllegalArgumentException | IllegalStateException e) {
-                    throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                    throw new CustomException(
+                            QuestionErrorCode.TTS_GENERATION_FAILED
+                    );
                 }
 
                 // 질문 기록 저장 (기본/외부 단어 공통)
@@ -117,9 +121,7 @@ public class QuestionConfirmService {
                 String wordAudioUrl;
                 String imageUrl;
                 try {
-                    wordAudioUrl = candidateTtsService.resolveAudioUrl(
-                            word.getWordAudioUrl()
-                    );
+                    wordAudioUrl = candidateTtsService.resolveAudioUrl(audioKey);
 
                     imageUrl = candidateTtsService.resolvePresignedUrl(
                             word.getImageUrl()

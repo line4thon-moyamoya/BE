@@ -34,8 +34,6 @@ public class CandidateSearchService {
     private final WordRepository wordRepository;
     private final ExternalDictionaryService externalDictionaryService;
     private final PronunciationVariantGenerator pronunciationVariantGenerator;
-    private final PronunciationSimilarity pronunciationSimilarity;
-    private final ContextScoringService contextScoringService;
 
     public List<WordCandidate> searchFirstCandidates(List<String> targetExpressions) {
         List<WordCandidate> curatedCandidates = rankingService.rankFirst(targetExpressions);
@@ -188,55 +186,14 @@ public class CandidateSearchService {
                 continue;
             }
 
+            // 외부 단어는 문맥, 출처 메타데이터가 없으므로 발음 점수만 사용
             double contextScore = 0.0;
-            if (originalText != null && !originalText.isBlank()) {
-                contextScore = contextScoringService.calculateContextScore(
-                        originalText,
-                        new com.moyamoya.domain.question.model.QuestionWordData(
-                                normalizedWord,
-                                normalizedWord,
-                                null,
-                                heardFrom == null ? null : heardFrom.name(),
-                                null,
-                                null,
-                                null,
-                                normalizedWord,
-                                normalizedWord,
-                                null,
-                                word.getDefinition(),
-                                null,
-                                word.getDescAge3To4(),
-                                word.getDescAge5(),
-                                null
-                        )
-                );
-            }
-
-            double sourceScore = 0.0;
-            if (heardFrom != null && heardFrom != HeardFrom.UNKNOWN) {
-                sourceScore = contextScoringService.calculateSourceScore(heardFrom,
-                        new com.moyamoya.domain.question.model.QuestionWordData(
-                                normalizedWord,
-                                normalizedWord,
-                                null,
-                                heardFrom.name(),
-                                null,
-                                null,
-                                null,
-                                normalizedWord,
-                                normalizedWord,
-                                null,
-                                word.getDefinition(),
-                                null,
-                                word.getDescAge3To4(),
-                                word.getDescAge5(),
-                                null
-                        ));
-            }
 
             double finalScore = isFirstPass
                     ? pronunciationScore
-                    : calculateSecondPassScore(pronunciationScore, contextScore, sourceScore);
+                    : calculateSecondPassScore(
+                    pronunciationScore, null, null
+            );
 
             if (!isFirstPass && finalScore < F2_MIN_FINAL_SCORE) {
                 continue;
@@ -347,33 +304,14 @@ public class CandidateSearchService {
                         continue;
                     }
 
+                    // 신규 사전 단어도 현재는 발음 점수만 사용
                     double contextScore = 0.0;
-                    if (originalText != null && !originalText.isBlank()) {
-                        contextScore = contextScoringService.calculateContextScore(
-                                originalText,
-                                new com.moyamoya.domain.question.model.QuestionWordData(
-                                        candidateWord,
-                                        candidateWord,
-                                        null,
-                                        heardFrom == null ? null : heardFrom.name(),
-                                        null,
-                                        null,
-                                        null,
-                                        candidateWord,
-                                        candidateWord,
-                                        null,
-                                        entry.definition(),
-                                        null,
-                                        null,
-                                        null,
-                                        null
-                                )
-                        );
-                    }
 
                     double finalScore = isFirstPass
                             ? pronunciationScore
-                            : calculateSecondPassScore(pronunciationScore, contextScore, 0.0);
+                            : calculateSecondPassScore(
+                            pronunciationScore, null, null
+                    );
 
                     if (!isFirstPass && finalScore < F2_MIN_FINAL_SCORE) {
                         continue;
@@ -397,10 +335,24 @@ public class CandidateSearchService {
             }
         }
 
+        // 표제어별 중복 제거 후 상위 3개 후보 선정
         return candidates.stream()
+                .collect(Collectors.toMap(
+                        candidate -> candidate.word().trim().toLowerCase(),
+                        candidate -> candidate,
+                        (existing, replacement) ->
+                                replacement.finalScore() > existing.finalScore()
+                                        ? replacement
+                                        : existing,
+                        LinkedHashMap::new
+                ))
+                .values()
+                .stream()
                 .sorted(Comparator
                         .comparingDouble(WordCandidate::finalScore).reversed()
-                        .thenComparing(Comparator.comparingDouble(WordCandidate::pronunciationScore).reversed())
+                        .thenComparing(
+                                Comparator.comparingDouble(WordCandidate::pronunciationScore).reversed()
+                        )
                         .thenComparing(WordCandidate::word))
                 .limit(3)
                 .toList();
@@ -440,16 +392,25 @@ public class CandidateSearchService {
                 .toList();
     }
 
-    private double calculateSecondPassScore(double pronunciationScore, double contextScore, double sourceScore) {
-        double pronWeight = 0.60;
-        double contextWeight = 0.25;
-        double sourceWeight = 0.15;
-        double totalWeight = pronWeight + contextWeight + sourceWeight;
-        return Math.clamp(
-                (pronunciationScore * pronWeight + contextScore * contextWeight + sourceScore * sourceWeight) / totalWeight,
-                0.0,
-                1.0
-        );
+    private double calculateSecondPassScore(
+            double pronunciationScore,
+            Double contextScore,
+            Double sourceScore
+    ) {
+        double totalScore = pronunciationScore * 0.60;
+        double totalWeight = 0.60;
+
+        if (contextScore != null) {
+            totalScore += contextScore * 0.25;
+            totalWeight += 0.25;
+        }
+
+        if (sourceScore != null) {
+            totalScore += sourceScore * 0.15;
+            totalWeight += 0.15;
+        }
+
+        return Math.clamp(totalScore / totalWeight, 0.0, 1.0);
     }
 
     private boolean isExcludedWord(String normalizedWord, Set<String> excludedKeys) {

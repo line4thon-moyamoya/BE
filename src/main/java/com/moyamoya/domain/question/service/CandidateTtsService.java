@@ -37,16 +37,31 @@ public class CandidateTtsService {
         return moyaTtsService.getContentType();
     }
 
-    public void ensureStoredAudio(Word word) {
-        if (!StringUtils.hasText(word.getWordAudioUrl())) {
-            byte[] audio = moyaTtsService.synthesize(word.getWord());
-
-            String key = "words/audio/" + word.getId() + "/word.wav";
-            String uploadKey = s3Service.uploadWav(key, audio);
-            word.updateWordAudioUrl(uploadKey);
+    public String ensureStoredAudio(Word word) {
+        if (StringUtils.hasText(word.getWordAudioUrl())) {
+            return word.getWordAudioUrl();
         }
 
-        wordRepository.save(word);
+        // TTS 생성 및 S3 업로드
+        byte[] audio = moyaTtsService.synthesize(word.getWord());
+
+        String key = "words/audio/" + word.getId() + "/word.wav";
+        String uploadKey = s3Service.uploadWav(key, audio);
+
+        // Word 전체가 아닌 음성 URL만 조건부 업데이트
+        int updated = wordRepository.updateWordAudioUrlIfAbsent(
+                word.getId(),
+                uploadKey
+        );
+
+        if (updated == 1) {
+            return uploadKey;
+        }
+
+        // 다른 요청이 먼저 저장했다면 DB의 최신 값 사용
+        return wordRepository.findById(word.getId())
+                .map(Word::getWordAudioUrl)
+                .orElse(null);
     }
 
     public String resolveAudioUrl(String s3Key) {
