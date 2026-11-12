@@ -1,7 +1,5 @@
 package com.moyamoya.domain.song.service;
 
-import com.moyamoya.domain.question.service.GoogleTtsService;
-import com.moyamoya.domain.question.service.PythonAudioProcessorClient;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import javax.sound.sampled.AudioFormat;
@@ -18,8 +16,8 @@ public class SongTtsService {
     private static final int MAX_ATTEMPTS = 3;
     private static final int MAX_AUDIO_BYTES = 10 * 1024 * 1024;
     private static final double MIN_WINDOW_RMS = 32768 * Math.pow(10, -40.0 / 20);
-    private final GoogleTtsService googleTtsService;
-    private final PythonAudioProcessorClient processorClient;
+    private final SongGoogleTtsService googleTtsService;
+    private final PythonSongMixerClient processorClient;
 
     public byte[] synthesize(String text) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -28,7 +26,7 @@ public class SongTtsService {
             }
             byte[] original = googleTtsService.synthesize(text);
             if (hasAudibleSpeech(original)) {
-                byte[] processed = processorClient.process(original);
+                byte[] processed = processorClient.processVoice(original);
                 if (hasAudibleSpeech(processed)) {
                     return processed;
                 }

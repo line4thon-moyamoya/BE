@@ -3,8 +3,6 @@ package com.moyamoya.domain.song.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.moyamoya.domain.question.service.GoogleTtsService;
-import com.moyamoya.domain.question.service.PythonAudioProcessorClient;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import javax.sound.sampled.AudioFileFormat;
@@ -14,8 +12,8 @@ import javax.sound.sampled.AudioSystem;
 import org.junit.jupiter.api.Test;
 
 class SongTtsServiceTest {
-    private final GoogleTtsService google = mock(GoogleTtsService.class);
-    private final PythonAudioProcessorClient processor = mock(PythonAudioProcessorClient.class);
+    private final SongGoogleTtsService google = mock(SongGoogleTtsService.class);
+    private final PythonSongMixerClient processor = mock(PythonSongMixerClient.class);
     private final SongTtsService service = new SongTtsService(google, processor);
 
     @Test
@@ -23,10 +21,10 @@ class SongTtsServiceTest {
         byte[] quiet = wav(0.003, 0.28, 0.28, false);
         byte[] good = wav(0.2, 0.4, 0.32, false);
         when(google.synthesize("우")).thenReturn(quiet, good);
-        when(processor.process(good)).thenReturn(good);
+        when(processor.processVoice(good)).thenReturn(good);
         assertThat(service.synthesize("우")).isSameAs(good);
         verify(google, times(2)).synthesize("우");
-        verify(processor).process(good);
+        verify(processor).processVoice(good);
         verifyNoMoreInteractions(processor);
     }
 
@@ -42,7 +40,7 @@ class SongTtsServiceTest {
     void retriesWhenProcessingRemovesAudibleSpeech() throws Exception {
         byte[] good = wav(0.2, 0.4, 0.32, false);
         when(google.synthesize("우")).thenReturn(good);
-        when(processor.process(good)).thenReturn(wav(0, 0.24, 0.24, false), good);
+        when(processor.processVoice(good)).thenReturn(wav(0, 0.24, 0.24, false), good);
         assertThat(service.synthesize("우")).isSameAs(good);
         verify(google, times(2)).synthesize("우");
     }

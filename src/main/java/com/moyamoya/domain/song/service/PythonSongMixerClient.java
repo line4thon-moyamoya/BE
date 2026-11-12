@@ -58,6 +58,21 @@ public class PythonSongMixerClient {
         }
     }
 
+    public byte[] processVoice(byte[] voice) {
+        var body = new LinkedMultiValueMap<String, Object>();
+        body.add("audio", audioPart("voice.wav", voice, MediaType.parseMediaType("audio/wav")));
+        try {
+            byte[] audio = restClient.post().uri("/songs/process")
+                    .contentType(MediaType.MULTIPART_FORM_DATA).body(body).retrieve().body(byte[].class);
+            if (audio == null || audio.length == 0) {
+                throw new IllegalStateException("노래 음성 후처리 결과가 비어 있습니다.");
+            }
+            return audio;
+        } catch (RestClientException exception) {
+            throw new IllegalStateException("노래 음성 후처리 서버 호출에 실패했습니다.", exception);
+        }
+    }
+
     private HttpEntity<ByteArrayResource> audioPart(String filename, byte[] audio, MediaType contentType) {
         var resource = new ByteArrayResource(audio) {
             @Override
