@@ -2,6 +2,7 @@ package com.moyamoya.domain.word.repository;
 
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.entity.WordSourceType;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +19,7 @@ public interface WordRepository extends JpaRepository<Word, Long> {
 
     List<Word> findAllBySourceType(WordSourceType sourceType);
 
+    @Transactional
     @Modifying
     @Query("""
     UPDATE Word w
