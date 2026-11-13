@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from song_mixer import SongMixError, mix_song
+from song_voice_processor import process_song_voice
 
 router = APIRouter()
 MAX_BACKING_BYTES = 20 * 1024 * 1024
@@ -28,6 +29,18 @@ async def read_audio(upload: UploadFile, limit: int) -> bytes:
     if not data or len(data) > limit:
         raise HTTPException(status_code=400, detail="오디오 파일 크기가 올바르지 않습니다.")
     return data
+
+
+@router.post("/songs/process", response_class=Response)
+async def process_song_audio(audio: Annotated[UploadFile, File()]):
+    data = await read_audio(audio, MAX_VOICE_BYTES)
+    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise HTTPException(status_code=400, detail="노래 음성은 WAV 파일이어야 합니다.")
+    try:
+        processed = await run_in_threadpool(process_song_voice, data)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="노래 음성 후처리에 실패했습니다.") from exc
+    return Response(content=processed, media_type="audio/wav")
 
 
 @router.post("/songs/mix", response_class=Response)
