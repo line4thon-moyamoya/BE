@@ -19,20 +19,24 @@ public class SongTtsService {
     private final SongGoogleTtsService googleTtsService;
     private final PythonSongMixerClient processorClient;
 
-    public byte[] synthesize(String text) {
+    byte[] synthesize(String text, SongGenerationMetrics metrics) {
+        metrics.inputStarted();
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new IllegalStateException("노래 TTS 생성이 중단됐습니다.");
             }
-            byte[] original = googleTtsService.synthesize(text);
-            if (hasAudibleSpeech(original)) {
-                byte[] processed = processorClient.processVoice(original);
-                if (hasAudibleSpeech(processed)) {
+            metrics.ttsStarted(attempt);
+            byte[] original = metrics.measure(SongGenerationMetrics.Stage.TTS, () -> googleTtsService.synthesize(text));
+            if (metrics.measure(SongGenerationMetrics.Stage.QUALITY, () -> hasAudibleSpeech(original))) {
+                byte[] processed = metrics.measure(SongGenerationMetrics.Stage.PROCESSING,
+                        () -> processorClient.processVoice(original));
+                if (metrics.measure(SongGenerationMetrics.Stage.QUALITY, () -> hasAudibleSpeech(processed))) {
                     return processed;
                 }
             }
             log.warn("노래 TTS 음량 부족. text={}, attempt={}/{}", text, attempt, MAX_ATTEMPTS);
         }
+        metrics.exhausted();
         throw new IllegalStateException("노래 TTS 음량이 너무 작거나 무음입니다.");
     }
 

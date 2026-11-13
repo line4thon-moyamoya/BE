@@ -5,9 +5,11 @@ import com.moyamoya.domain.song.model.SongAudioPlacement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class SongMixingService {
     private static final int MAX_VOICE_BYTES = 10 * 1024 * 1024;
     private static final long MAX_TOTAL_BYTES = 50L * 1024 * 1024;
@@ -29,8 +31,24 @@ public class SongMixingService {
     }
 
     public SongMixResponse mix(List<String> words) {
+        var metrics = new SongGenerationMetrics();
+        String result = "FAILED";
+        String error = "none";
+        try {
+            var response = mix(words, metrics);
+            result = "SUCCESS";
+            return response;
+        } catch (RuntimeException exception) {
+            error = exception.getClass().getSimpleName();
+            throw exception;
+        } finally {
+            log.info("노래 합성 요약: result={}, error={}, {}", result, error, metrics.summary());
+        }
+    }
+
+    private SongMixResponse mix(List<String> words, SongGenerationMetrics metrics) {
         var plan = planner.plan(words);
-        byte[] backing = storage.downloadBacking();
+        byte[] backing = metrics.measure(SongGenerationMetrics.Stage.BACKING, storage::downloadBacking);
         var indexes = new LinkedHashMap<String, Integer>();
         var voices = new ArrayList<byte[]>();
         var placements = new ArrayList<SongAudioPlacement>();
@@ -39,7 +57,7 @@ public class SongMixingService {
             var speech = plan.get(index);
             Integer audioIndex = indexes.get(speech.text());
             if (audioIndex == null) {
-                byte[] voice = ttsService.synthesize(speech.text());
+                byte[] voice = ttsService.synthesize(speech.text(), metrics);
                 if (voice == null || voice.length == 0 || voice.length > MAX_VOICE_BYTES) {
                     throw new IllegalStateException("단어 TTS 음성 데이터가 올바르지 않습니다.");
                 }
@@ -56,7 +74,8 @@ public class SongMixingService {
                     ? null : Math.rint((nextStart - speech.startSec()) * 1000) / 1000;
             placements.add(new SongAudioPlacement(audioIndex, speech.startSec(), availableSec));
         }
-        byte[] audio = mixerClient.mix(backing, voices, placements);
-        return storage.upload(audio);
+        byte[] audio = metrics.measure(SongGenerationMetrics.Stage.MIXING,
+                () -> mixerClient.mix(backing, voices, placements));
+        return metrics.measure(SongGenerationMetrics.Stage.UPLOAD, () -> storage.upload(audio));
     }
 }

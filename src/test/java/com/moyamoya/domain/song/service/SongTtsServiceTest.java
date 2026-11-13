@@ -22,7 +22,9 @@ class SongTtsServiceTest {
         byte[] good = wav(0.2, 0.4, 0.32, false);
         when(google.synthesize("우")).thenReturn(quiet, good);
         when(processor.processVoice(good)).thenReturn(good);
-        assertThat(service.synthesize("우")).isSameAs(good);
+        var metrics = new SongGenerationMetrics();
+        assertThat(service.synthesize("우", metrics)).isSameAs(good);
+        assertThat(metrics.summary()).contains("inputs=1", "ttsCalls=2", "qualityRetries=1", "exhaustedInputs=0");
         verify(google, times(2)).synthesize("우");
         verify(processor).processVoice(good);
         verifyNoMoreInteractions(processor);
@@ -31,7 +33,10 @@ class SongTtsServiceTest {
     @Test
     void stopsAfterThreeSilentResults() throws Exception {
         when(google.synthesize("우")).thenReturn(wav(0, 0.24, 0.24, false));
-        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우"));
+        var metrics = new SongGenerationMetrics();
+        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우", metrics));
+        assertThat(metrics.summary()).contains("inputs=1", "ttsCalls=3", "qualityRetries=2",
+                "exhaustedInputs=1", "failedStage=QUALITY");
         verify(google, times(3)).synthesize("우");
         verifyNoInteractions(processor);
     }
@@ -41,14 +46,14 @@ class SongTtsServiceTest {
         byte[] good = wav(0.2, 0.4, 0.32, false);
         when(google.synthesize("우")).thenReturn(good);
         when(processor.processVoice(good)).thenReturn(wav(0, 0.24, 0.24, false), good);
-        assertThat(service.synthesize("우")).isSameAs(good);
+        assertThat(service.synthesize("우", new SongGenerationMetrics())).isSameAs(good);
         verify(google, times(2)).synthesize("우");
     }
 
     @Test
     void doesNotRepeatAuthenticationOrNetworkExceptionInsideQualityRetry() {
         when(google.synthesize("우")).thenThrow(new IllegalStateException("authentication"));
-        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우"));
+        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우", new SongGenerationMetrics()));
         verify(google).synthesize("우");
         verifyNoInteractions(processor);
     }
@@ -64,7 +69,7 @@ class SongTtsServiceTest {
     @Test
     void rejectsMalformedWavWithoutRetrying() {
         when(google.synthesize("우")).thenReturn(new byte[]{1, 2, 3});
-        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우"));
+        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우", new SongGenerationMetrics()));
         verify(google).synthesize("우");
         verifyNoInteractions(processor);
     }
