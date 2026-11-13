@@ -12,8 +12,7 @@ import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
+import com.moyamoya.global.s3.S3Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -37,12 +36,12 @@ class WordLookupTransactionTest {
         WordRepository words = mock(WordRepository.class);
         LearnedWordRepository cards = mock(LearnedWordRepository.class);
         CandidateTtsService tts = mock(CandidateTtsService.class);
-        EntityManager em = mock(EntityManager.class);
+        S3Service s3Service = mock(S3Service.class);
         User owner = mock(User.class);
         when(owner.getId()).thenReturn(7L);
         Child child = Child.create(owner, "지우", AgeGroup.AGE_5);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명",
-                null, null, "노래", null, "image.png", null, null, null);
+                null, null, null, "image.png", null);
         ReflectionTestUtils.setField(word, "id", 1L);
         when(children.findById(2L)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
@@ -60,33 +59,34 @@ class WordLookupTransactionTest {
         } else {
             when(words.findById(1L)).thenReturn(Optional.of(word));
         }
-        when(em.find(Word.class, 1L, LockModeType.PESSIMISTIC_WRITE)).thenAnswer(invocation -> {
-            assertThat(transactions.events).containsExactly("read begin", "commit", "write begin");
-            assertThat(TransactionSynchronizationManager.isCurrentTransactionReadOnly()).isFalse();
-            return word;
+        when(tts.ensureStoredAudio(word)).thenAnswer(invocation -> {
+            assertThat(transactions.events)
+                    .containsExactly("read begin", "commit", "write begin");
+
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                    .isTrue();
+
+            return "word.wav";
         });
-        doAnswer(invocation -> {
-            assertThat(transactions.events).containsExactly("read begin", "commit", "write begin");
-            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
-            ReflectionTestUtils.setField(word, "descriptionAudioAge5Url", "five.wav");
-            return null;
-        }).when(tts).ensureStoredAudio(word, AgeGroup.AGE_5);
-        when(tts.resolveAudioUrl("five.wav")).thenReturn("https://audio.test/five.wav");
+        when(tts.resolveAudioUrl("word.wav")).thenReturn("https://audio.test/word.wav");
+        when(s3Service.getPresignedUrl("image.png"))
+                .thenReturn("https://s3.test/presigned/image.png");
 
         WordLookupService lookup = proxy(new WordLookupService(children, words, cards), transactions);
-        WordDescriptionAudioService audio = proxy(new WordDescriptionAudioService(tts, em), transactions);
+        WordDescriptionAudioService audio = proxy(new WordDescriptionAudioService(tts), transactions);
         if (cardDetail) {
-            var response = proxy(new WordCardService(lookup, audio), transactions).getWordCardDetail(7L, 2L, 35L);
+            var response = proxy(new WordCardService(lookup, audio, s3Service), transactions)
+                    .getWordCardDetail(7L, 2L, 35L);
             assertThat(response.learnedWordId()).isEqualTo(35L);
-            assertThat(response.imageUrl()).isEqualTo("image.png");
-            assertThat(response.descriptionAudioUrl()).isEqualTo("https://audio.test/five.wav");
+            assertThat(response.imageUrl()).isEqualTo("https://s3.test/presigned/image.png");
+            assertThat(response.wordAudioUrl()).isEqualTo("https://audio.test/word.wav");
         } else {
             var response = proxy(new WordService(lookup, audio), transactions).getWordDescription(7L, 1L, 2L);
-            assertThat(response.descriptionAudioUrl()).isEqualTo("https://audio.test/five.wav");
+            assertThat(response.wordAudioUrl()).isEqualTo("https://audio.test/word.wav");
         }
         assertThat(transactions.events).containsExactly("read begin", "commit", "write begin", "commit");
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-        verify(tts).ensureStoredAudio(word, AgeGroup.AGE_5);
+        verify(tts).ensureStoredAudio(word);
     }
 
     @SuppressWarnings("unchecked")

@@ -15,7 +15,6 @@ public record QuestionWordData(
         String hint,
         String descAge3To4,
         String descAge5,
-        String example,
-        String songLine
+        String example
 ) {
 }

@@ -64,8 +64,7 @@ public class QuestionController {
                     "imageUrl": null,
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
                     "wordAudioBase64": null,
-                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
-                    "descriptionAudioBase64": null
+                    "wordAudioContentType": null
                   },
                   {
                     "candidateId": "c_002",
@@ -75,8 +74,7 @@ public class QuestionController {
                     "imageUrl": null,
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
                     "wordAudioBase64": null,
-                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
-                    "descriptionAudioBase64": null
+                    "wordAudioContentType": null
                   }
                 ],
                 "dialogue": {
@@ -181,8 +179,7 @@ public class QuestionController {
                     "imageUrl": "https://cdn.example.com/images/word-112.png",
                     "wordAudioUrl": "https://example.com/presigned-word-audio",
                     "wordAudioBase64": null,
-                    "descriptionAudioUrl": "https://example.com/presigned-description-audio",
-                    "descriptionAudioBase64": null
+                    "wordAudioContentType": null
                   }
                 ],
                 "dialogue": {
@@ -275,7 +272,6 @@ public class QuestionController {
                 "description": "사람들이 뽑아서 나라의 법을 만들고 정하는 일을 하는 사람이야.",
                 "imageUrl": "https://cdn.example.com/images/word-159.png",
                 "wordAudioUrl": "https://example.com/presigned-word-audio",
-                "descriptionAudioUrl": "https://example.com/presigned-description-audio",
                 "nextStep": "WORD_LEARNING"
               }
             }

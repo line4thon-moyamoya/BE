@@ -1,7 +1,7 @@
 package com.moyamoya.domain.song.service;
 
 import com.moyamoya.domain.song.dto.response.SongMixResponse;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.io.IOException;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,11 +15,11 @@ public class SongAudioStorageService {
     private static final String BACKING_KEY = "songs/backing/moyamoya-v1.m4a";
     private static final int MAX_BACKING_BYTES = 20 * 1024 * 1024;
     private final S3Client s3Client;
-    private final S3AudioService audioService;
+    private final S3Service audioService;
     private final String bucket;
     private final String prefix;
 
-    public SongAudioStorageService(S3Client s3Client, S3AudioService audioService,
+    public SongAudioStorageService(S3Client s3Client, S3Service audioService,
             @Value("${aws.s3.bucket}") String bucket,
             @Value("${aws.s3.prefix:}") String prefix) {
         this.s3Client = s3Client;

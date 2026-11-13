@@ -24,3 +24,5 @@ secrets/
 google-tts.json
 moyamoya-tts-*.json
 
+/src/main/resources/seed/images/*.png
+

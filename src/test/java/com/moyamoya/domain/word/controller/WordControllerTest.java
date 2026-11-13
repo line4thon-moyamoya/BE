@@ -71,7 +71,7 @@ class WordControllerTest {
                 .andExpect(content().json("""
                         {"success":true,"code":200,"message":"단어 카드 상세 정보를 조회했습니다.",
                          "data":{"learnedWordId":35,"wordId":1,"word":"적금","description":"아이 설명",
-                                 "imageUrl":"image.png","descriptionAudioUrl":"desc.wav"}}
+                                 "imageUrl":"image.png","wordAudioUrl":"desc.wav"}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
         verify(cardService).getWordCardDetail(7L, 2L, 35L);
     }
@@ -85,7 +85,7 @@ class WordControllerTest {
                 .andExpect(content().json("""
                         {"success":true,"code":200,"message":"단어 카드 상세 정보를 조회했습니다.",
                          "data":{"learnedWordId":35,"wordId":1,"word":"적금","description":null,
-                                 "imageUrl":null,"descriptionAudioUrl":null}}
+                                 "imageUrl":null,"wordAudioUrl":null}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
     }
 
@@ -142,7 +142,7 @@ class WordControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"success":true,"code":200,"message":"단어 정보를 조회했습니다.",
-                         "data":{"wordId":1,"word":"적금","description":"아이 설명","descriptionAudioUrl":"desc.mp3"}}
+                        "data":{"wordId":1,"word":"적금","description":"아이 설명","wordAudioUrl":"desc.mp3"}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
         verify(service).getWordDescription(7L, 1L, 2L);
     }
@@ -154,7 +154,7 @@ class WordControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
                         {"success":true,"code":200,"message":"단어 정보를 조회했습니다.",
-                         "data":{"wordId":1,"word":"적금","description":null,"descriptionAudioUrl":null}}
+                        "data":{"wordId":1,"word":"적금","description":null,"wordAudioUrl":null}}
                         """, org.springframework.test.json.JsonCompareMode.STRICT));
     }
 
