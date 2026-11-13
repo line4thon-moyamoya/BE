@@ -14,4 +14,8 @@ public class MoyaTtsService {
         byte[] originalWav = googleTtsService.synthesize(text);
         return processorClient.process(originalWav);
     }
+
+    public String getContentType() {
+        return "audio/wav";
+    }
 }

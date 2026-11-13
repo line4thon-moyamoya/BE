@@ -9,7 +9,7 @@ import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class GuardianWordRequestServiceTest {
 
     private ChildRepository childRepository;
     private WordRequestRepository wordRequestRepository;
-    private S3AudioService s3AudioService;
+    private S3Service s3Service;
 
     private GuardianWordRequestService guardianWordRequestService;
 
@@ -38,12 +38,12 @@ class GuardianWordRequestServiceTest {
     void setUp() {
         childRepository = mock(ChildRepository.class);
         wordRequestRepository = mock(WordRequestRepository.class);
-        s3AudioService = mock(S3AudioService.class);
+        s3Service = mock(S3Service.class);
 
         guardianWordRequestService = new GuardianWordRequestService(
                 childRepository,
                 wordRequestRepository,
-                s3AudioService
+                s3Service
         );
     }
 
@@ -68,7 +68,7 @@ class GuardianWordRequestServiceTest {
                 .findByChildIdOrderByCreatedAtDesc(CHILD_ID))
                 .thenReturn(List.of(pending, resolved));
 
-        when(s3AudioService.getPresignedUrl(
+        when(s3Service.getPresignedUrl(
                 "questions/original/2/31.wav"
         )).thenReturn("https://example.com/audio.wav");
 
@@ -115,7 +115,7 @@ class GuardianWordRequestServiceTest {
         assertThat(response).hasSize(1);
         assertThat(response.get(0).audioUrl()).isNull();
 
-        verifyNoInteractions(s3AudioService);
+        verifyNoInteractions(s3Service);
     }
 
     // 요청 목록이 없으면 빈 리스트 반환

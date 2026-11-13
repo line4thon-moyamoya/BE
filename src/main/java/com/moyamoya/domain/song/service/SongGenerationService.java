@@ -4,7 +4,7 @@ import com.moyamoya.domain.song.entity.SongStatus;
 import com.moyamoya.domain.song.dto.response.SongMixResponse;
 import com.moyamoya.domain.song.repository.SongRepository;
 import com.moyamoya.domain.song.repository.SongWordRepository;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,12 +18,12 @@ public class SongGenerationService {
     private final SongRepository songs;
     private final SongWordRepository songWords;
     private final SongMixingService mixingService;
-    private final S3AudioService audioService;
+    private final S3Service audioService;
     private final TransactionTemplate readTransaction;
     private final TransactionTemplate writeTransaction;
 
     public SongGenerationService(SongRepository songs, SongWordRepository songWords,
-            SongMixingService mixingService, S3AudioService audioService,
+            SongMixingService mixingService, S3Service audioService,
             PlatformTransactionManager transactionManager) {
         this.songs = songs;
         this.songWords = songWords;

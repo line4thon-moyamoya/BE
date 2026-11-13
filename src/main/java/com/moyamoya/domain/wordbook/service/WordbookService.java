@@ -8,6 +8,7 @@ import com.moyamoya.domain.wordbook.dto.response.LearnedWordResponse;
 import com.moyamoya.domain.wordbook.dto.response.WordbookResponse;
 import com.moyamoya.domain.wordbook.exception.WordbookErrorCode;
 import com.moyamoya.global.exception.CustomException;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,12 +19,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class WordbookService {
     private final ChildRepository childRepository;
     private final LearnedWordRepository learnedWordRepository;
+    private final S3Service s3Service;
 
     @Transactional(readOnly = true)
     public WordbookResponse getWordbook(Long userId, Long childId) {
         validateChildOwnership(userId, childId);
         List<LearnedWordResponse> cards = learnedWordRepository.findAllWithWordByChildId(childId)
-                .stream().map(LearnedWordResponse::from).toList();
+                .stream()
+                .map(learnedWord -> {
+                    String imageKey = learnedWord.getWord().getImageUrl();
+                    String imagePresignedUrl = imageKey == null
+                            ? null
+                            : s3Service.getPresignedUrl(imageKey);
+                    return LearnedWordResponse.from(learnedWord, imagePresignedUrl);
+                })
+                .toList();
         return new WordbookResponse(cards.size(), cards);
     }
 

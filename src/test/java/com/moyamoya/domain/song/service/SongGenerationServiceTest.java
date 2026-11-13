@@ -12,7 +12,7 @@ import com.moyamoya.domain.song.repository.SongRepository;
 import com.moyamoya.domain.song.repository.SongWordRepository;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.IntStream;
@@ -28,7 +28,7 @@ class SongGenerationServiceTest {
     private final SongRepository songs = mock(SongRepository.class);
     private final SongWordRepository words = mock(SongWordRepository.class);
     private final SongMixingService mixing = mock(SongMixingService.class);
-    private final S3AudioService audio = mock(S3AudioService.class);
+    private final S3Service audio = mock(S3Service.class);
     private final SongGenerationService service = new SongGenerationService(songs, words, mixing, audio,
             new LocalTransactions());
     private final Song song = Song.create(mock(Child.class), "test song");

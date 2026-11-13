@@ -21,7 +21,7 @@ public class QuestionTargetExtractor {
 
     // 설정에 없는 경우 사용할 기본 호칭 패턴
     private static final Pattern DEFAULT_VOCATIVE =
-            Pattern.compile("^(?:엄마|아빠|선생님|모야)(?:야|아)?[,，]?\\s+");
+            Pattern.compile("^(?:엄마|아빠|선생님|모야)(?:야|아|와|랑)?[,，]?\\s+");
 
     // "경제"라는 게 뭐야? 형태
     private static final Pattern QUOTED_TARGET =
@@ -79,6 +79,9 @@ public class QuestionTargetExtractor {
         if (target == null) {
             target = sentence;
         }
+
+        // 질문에서 직접적인 호칭/의문 표현만 제거하고, 남는 단어는 실제 검색 대상만 남긴다.
+        target = stripLeadingContext(target);
 
         return successOrFailure(originalSentence, target);
     }
@@ -211,6 +214,24 @@ public class QuestionTargetExtractor {
         }
 
         return null;
+    }
+
+    private String stripLeadingContext(String target) {
+        if (target == null) {
+            return null;
+        }
+
+        String trimmed = target.trim();
+
+        if (trimmed.isEmpty()) {
+            return trimmed;
+        }
+
+        // 호칭 뒤에 조사나 부름 표현이 붙은 경우 제거
+        String vocativeRegex =
+                "^(?:엄마|아빠|선생님|모야)(?:야|아|와|랑)?[,，]?\\s+";
+
+        return trimmed.replaceFirst(vocativeRegex, "").trim();
     }
 
     private boolean isPointingOnly(String target) {

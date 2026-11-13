@@ -28,7 +28,7 @@ public class WordCardController {
     private static final String SUCCESS_EXAMPLE = """
             {"success": true, "code": 200, "message": "단어 카드 상세 정보를 조회했습니다.",
              "data": {"learnedWordId": 35, "wordId": 1, "word": "적금", "description": "적금은 돈을 조금씩 모으는 거야.",
-                      "imageUrl": "https://example.com/images/1.png", "descriptionAudioUrl": "https://example.com/audio/1-desc.wav"}}
+                      "imageUrl": "https://example.com/images/1.png", "wordAudioUrl": "https://example.com/audio/1-word.wav"}}
             """;
     private static final String INVALID_CARD_EXAMPLE = """
             {"success": false, "code": "LEARNED_WORD400", "message": "올바른 단어 카드 ID를 입력해 주세요.", "data": null}
@@ -58,7 +58,7 @@ public class WordCardController {
     private final WordCardService wordCardService;
 
     @Operation(summary = "공통 단어 카드 상세 조회",
-            description = "아이가 획득한 단어 카드의 단어, 설명, 이미지와 설명 음성 URL을 조회합니다.",
+            description = "아이가 획득한 단어 카드의 단어, 설명, 이미지와 단어 발음 음성 URL을 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "카드 상세 조회 성공",

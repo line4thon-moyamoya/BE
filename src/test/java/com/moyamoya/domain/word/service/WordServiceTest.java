@@ -7,7 +7,6 @@ import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.question.service.CandidateTtsService;
-import jakarta.persistence.EntityManager;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.WordRepository;
@@ -26,7 +25,7 @@ class WordServiceTest {
     private final CandidateTtsService tts = mock(CandidateTtsService.class);
     private final WordService service = new WordService(new WordLookupService(children, words,
             mock(LearnedWordRepository.class)),
-            new WordDescriptionAudioService(tts, mock(EntityManager.class)));
+            new WordDescriptionAudioService(tts));
 
     private void child(AgeGroup age) {
         User owner = mock(User.class);
@@ -39,14 +38,14 @@ class WordServiceTest {
     void selectsDescriptionAndAudioForChildAge(AgeGroup age) {
         child(age);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명",
-                null, null, "노래", null, null, null, "young.wav", "five.wav");
-        when(tts.resolveAudioUrl(anyString())).thenAnswer(invocation -> "https://audio.test/" + invocation.getArgument(0));
+                null, null, null, null, "word.wav");
+        when(tts.resolveAudioUrl("word.wav")).thenReturn("https://audio.test/word.wav");
         when(words.findById(1L)).thenReturn(Optional.of(word));
         var response = service.getWordDescription(7L, 1L, 2L);
         assertThat(response.word()).isEqualTo("적금");
         assertThat(response.description()).isEqualTo(age == AgeGroup.AGE_3_4 ? "어린 설명" : "다섯 살 설명");
-        assertThat(response.descriptionAudioUrl()).isEqualTo("https://audio.test/" + (age == AgeGroup.AGE_3_4 ? "young.wav" : "five.wav"));
-        verify(tts, never()).ensureStoredAudio(any(), any());
+        assertThat(response.wordAudioUrl()).isEqualTo("https://audio.test/word.wav");
+        verify(tts, never()).ensureStoredAudio(any());
         verify(words).findById(1L);
         verify(words, never()).save(any());
     }
@@ -57,7 +56,7 @@ class WordServiceTest {
         when(words.findById(1L)).thenReturn(Optional.of(mock(Word.class)));
         var response = service.getWordDescription(7L, 1L, 2L);
         assertThat(response.description()).isNull();
-        assertThat(response.descriptionAudioUrl()).isNull();
+        assertThat(response.wordAudioUrl()).isNull();
     }
 
     private void assertError(String code, Long userId, Long wordId, Long childId) {

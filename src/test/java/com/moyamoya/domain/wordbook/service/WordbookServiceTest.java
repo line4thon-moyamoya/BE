@@ -11,6 +11,7 @@ import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.global.exception.CustomException;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -65,7 +66,8 @@ class WordbookServiceTest {
     }
     private final ChildRepository children = mock(ChildRepository.class);
     private final LearnedWordRepository cards = mock(LearnedWordRepository.class);
-    private final WordbookService service = new WordbookService(children, cards);
+    private final S3Service s3Service = mock(S3Service.class);
+    private final WordbookService service = new WordbookService(children, cards, s3Service);
 
     private Child ownedChild() {
         User owner = mock(User.class);
@@ -82,6 +84,8 @@ class WordbookServiceTest {
         when(word.getId()).thenReturn(10L);
         when(word.getWord()).thenReturn("자동차");
         when(word.getImageUrl()).thenReturn("/images/words/car.png");
+        when(s3Service.getPresignedUrl("/images/words/car.png"))
+                .thenReturn("https://s3.test/presigned/car.png");
         LearnedWord fresh = LearnedWord.create(child, word, true);
         LearnedWord viewed = LearnedWord.create(child, word, false);
         viewed.markAsViewed();
@@ -92,7 +96,7 @@ class WordbookServiceTest {
         assertThat(result.totalCount()).isEqualTo(2);
         assertThat(result.learnedWords().getFirst().wordId()).isEqualTo(10L);
         assertThat(result.learnedWords().getFirst().word()).isEqualTo("자동차");
-        assertThat(result.learnedWords().getFirst().imageUrl()).isEqualTo("/images/words/car.png");
+        assertThat(result.learnedWords().getFirst().imageUrl()).isEqualTo("https://s3.test/presigned/car.png");
         assertThat(result.learnedWords().getFirst().stickerEarned()).isTrue();
         assertThat(result.learnedWords().getFirst().isNew()).isTrue();
         assertThat(result.learnedWords().getLast().stickerEarned()).isFalse();

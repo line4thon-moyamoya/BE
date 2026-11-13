@@ -10,7 +10,7 @@ import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +23,7 @@ public class GuardianWordRequestService {
 
     private final ChildRepository childRepository;
     private final WordRequestRepository wordRequestRepository;
-    private final S3AudioService s3AudioService;
+    private final S3Service s3Service;
 
     // 물어볼 단어 전체 목록 조회 (PENDING + RESOLVED)
     @Transactional(readOnly = true)
@@ -40,7 +40,7 @@ public class GuardianWordRequestService {
                     // 프론트 재생용 Presigned URL로 변환
                     String audioUrl = request.getAudioUrl() == null
                             ? null
-                            : s3AudioService.getPresignedUrl(
+                            : s3Service.getPresignedUrl(
                             request.getAudioUrl()
                     );
 

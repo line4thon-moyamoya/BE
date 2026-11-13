@@ -55,3 +55,12 @@ tts:
 song:
   mixing:
     processor-read-timeout-ms: ${SONG_MIX_READ_TIMEOUT_MS:65000}
+
+dictionary:
+  stdict:
+    base-url: ${STDICT_BASE_URL:https://stdict.korean.go.kr/api}
+    key: ${STDICT_API_KEY:}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4.1-mini}

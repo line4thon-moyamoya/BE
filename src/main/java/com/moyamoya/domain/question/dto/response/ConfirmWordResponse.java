@@ -7,7 +7,6 @@ public record ConfirmWordResponse(
         String description,
         String imageUrl,
         String wordAudioUrl,
-        String descriptionAudioUrl,
         String nextStep
 ) {
 }

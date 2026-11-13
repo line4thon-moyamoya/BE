@@ -5,8 +5,10 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
+@DynamicUpdate
 @Table(
         name = "words",
         uniqueConstraints = @UniqueConstraint(
@@ -44,9 +46,6 @@ public class Word extends BaseTimeEntity {
     @Column(name = "hint", columnDefinition = "TEXT")
     private String hint;
 
-    @Column(name = "song_description", nullable = false, columnDefinition = "TEXT")
-    private String songDescription;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "heard_from", length = 20)
     private HeardFrom heardFrom;
@@ -56,12 +55,6 @@ public class Word extends BaseTimeEntity {
 
     @Column(name = "word_audio_url", length = 500)
     private String wordAudioUrl;
-
-    @Column(name = "description_audio_age_3_4_url", length = 500)
-    private String descriptionAudioAge3To4Url;
-
-    @Column(name = "description_audio_age_5_url", length = 500)
-    private String descriptionAudioAge5Url;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source_type", nullable = false, length = 20)
@@ -78,12 +71,9 @@ public class Word extends BaseTimeEntity {
             String descAge5,
             String example,
             String hint,
-            String songDescription,
             HeardFrom heardFrom,
             String imageUrl,
-            String wordAudioUrl,
-            String descriptionAudioAge3To4Url,
-            String descriptionAudioAge5Url
+            String wordAudioUrl
     ) {
         Word newWord = new Word();
 
@@ -94,12 +84,9 @@ public class Word extends BaseTimeEntity {
         newWord.descAge5 = descAge5;
         newWord.example = example;
         newWord.hint = hint;
-        newWord.songDescription = songDescription;
         newWord.heardFrom = heardFrom;
         newWord.imageUrl = imageUrl;
         newWord.wordAudioUrl = wordAudioUrl;
-        newWord.descriptionAudioAge3To4Url = descriptionAudioAge3To4Url;
-        newWord.descriptionAudioAge5Url = descriptionAudioAge5Url;
 
         newWord.sourceType = WordSourceType.EXTERNAL;
 
@@ -115,7 +102,6 @@ public class Word extends BaseTimeEntity {
             String descAge5,
             String example,
             String hint,
-            String songDescription,
             HeardFrom heardFrom
     ) {
         Word newWord = new Word();
@@ -127,7 +113,6 @@ public class Word extends BaseTimeEntity {
         newWord.descAge5 = descAge5;
         newWord.example = example;
         newWord.hint = hint;
-        newWord.songDescription = songDescription;
         newWord.heardFrom = heardFrom;
 
         // 기본 단어
@@ -136,8 +121,6 @@ public class Word extends BaseTimeEntity {
         // 음성 및 이미지는 추후 생성
         newWord.imageUrl = null;
         newWord.wordAudioUrl = null;
-        newWord.descriptionAudioAge3To4Url = null;
-        newWord.descriptionAudioAge5Url = null;
 
         return newWord;
     }
@@ -147,13 +130,25 @@ public class Word extends BaseTimeEntity {
         this.wordAudioUrl = s3Key;
     }
 
-    // 3~4세 설명 음성의 S3 객체 키 저장
-    public void updateDescriptionAudioAge3To4Url(String s3Key) {
-        this.descriptionAudioAge3To4Url = s3Key;
-    }
+    // 단어 이미지의 S3 객체 키 저장
+    public void updateImageUrl(String s3Key) { this.imageUrl = s3Key; }
 
-    // 5세 이상 설명 음성의 S3 객체 키 저장
-    public void updateDescriptionAudioAge5Url(String s3Key) {
-        this.descriptionAudioAge5Url = s3Key;
+
+    public void fillMissingDescriptions(
+            String descriptionAge3To4,
+            String descriptionAge5
+    ) {
+        // 기존 설명이 없을 때만 저장
+        if ((this.descAge3To4 == null || this.descAge3To4.isBlank())
+                && descriptionAge3To4 != null
+                && !descriptionAge3To4.isBlank()) {
+            this.descAge3To4 = descriptionAge3To4;
+        }
+
+        if ((this.descAge5 == null || this.descAge5.isBlank())
+                && descriptionAge5 != null
+                && !descriptionAge5.isBlank()) {
+            this.descAge5 = descriptionAge5;
+        }
     }
 }

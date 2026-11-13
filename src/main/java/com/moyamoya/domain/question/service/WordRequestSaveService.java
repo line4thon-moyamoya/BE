@@ -11,7 +11,7 @@ import com.moyamoya.domain.question.session.QuestionSessionStore;
 import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ public class WordRequestSaveService {
 
     private final QuestionSessionStore sessionStore;
     private final QuestionAudioTempService audioTempService;
-    private final S3AudioService s3AudioService;
+    private final S3Service s3Service;
     private final WordRequestRepository wordRequestRepository;
     private final ChildRepository childRepository;
     private final TransactionTemplate transactionTemplate;
@@ -121,7 +121,7 @@ public class WordRequestSaveService {
 
             String uploadedKey;
             try {
-                uploadedKey = s3AudioService.uploadAudio(
+                uploadedKey = s3Service.uploadAudio(
                         key,
                         audioBytes,
                         normalizedContentType
@@ -156,7 +156,7 @@ public class WordRequestSaveService {
             } catch (RuntimeException e) {
                 // DB 저장 실패 시 방금 업로드한 음성 삭제
                 try {
-                    s3AudioService.deleteObject(uploadedKey);
+                    s3Service.deleteObject(uploadedKey);
                 } catch (RuntimeException cleanupError) {
                     log.error(
                             "DB 저장 실패 후 S3 정리 실패: {}",

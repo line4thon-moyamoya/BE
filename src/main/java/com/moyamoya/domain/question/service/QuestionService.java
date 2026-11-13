@@ -38,10 +38,12 @@ public class QuestionService {
 
     private final QuestionTargetExtractor targetExtractor;
     private final JosaCandidateGenerator josaGenerator;
+    private final CandidateSearchService candidateSearchService;
     private final CandidateRankingService rankingService;
     private final SttService sttService;
     private final CandidateTtsService candidateTtsService;
     private final MoyaTtsService moyaTtsService;
+    private final WordDescriptionService wordDescriptionService;
     private final QuestionSessionStore sessionStore;
     private final WordRepository wordRepository;
     private final ChildRepository childRepository;
@@ -146,7 +148,7 @@ public class QuestionService {
                     .map(WordCandidate::candidateId)
                     .collect(Collectors.toSet());
 
-            List<WordCandidate> candidates = rankingService.rankSecond(
+            List<WordCandidate> candidates = candidateSearchService.searchSecondCandidates(
                     session.getTargetExpressions(),
                     session.getOriginalSentence(),
                     context,
@@ -160,8 +162,7 @@ public class QuestionService {
             List<WordCandidate> candidatesWithTts;
             try {
                 candidatesWithTts = enrichCandidatesWithTts(
-                        enrichedCandidates,
-                        session.getChildId()
+                        enrichedCandidates
                 );
             } catch (RuntimeException e) {
                 throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
@@ -244,13 +245,12 @@ public class QuestionService {
             throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
         }
 
-        List<WordCandidate> candidates = rankingService.rankFirst(expressions);
+        List<WordCandidate> candidates = candidateSearchService.searchFirstCandidates(expressions);
         List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
         List<WordCandidate> candidatesWithTts;
         try {
             candidatesWithTts = enrichCandidatesWithTts(
-                    enrichedCandidates,
-                    childId
+                    enrichedCandidates
             );
             session.setFirstCandidates(candidatesWithTts);
         } catch (IllegalArgumentException exception) {
@@ -322,117 +322,100 @@ public class QuestionService {
         return candidates.stream()
                 .map(candidate -> {
                     Word word = wordRepository.findByWord(candidate.word())
-                            .orElse(null);
+                           .orElse(null);
 
                     if (word == null) {
-                        return candidate;
+                       String easyDescription = wordDescriptionService.generate(
+                               candidate.word(),
+                               candidate.definition(),
+                               ageGroup
+                       );
+                       return candidate.withEasyDescription(easyDescription);
                     }
 
                     String ageDescription = ageGroup == AgeGroup.AGE_3_4
-                            ? word.getDescAge3To4()
-                            : word.getDescAge5();
+                           ? word.getDescAge3To4()
+                           : word.getDescAge5();
 
-                    String descriptionAudioUrl = ageGroup == AgeGroup.AGE_3_4
-                            ? word.getDescriptionAudioAge3To4Url()
-                            : word.getDescriptionAudioAge5Url();
+                    String definition = hasText(word.getDefinition())
+                           ? word.getDefinition()
+                           : candidate.definition();
 
-                    String resolvedDescription = hasText(ageDescription)
-                            ? ageDescription
-                            : (word.getDefinition() != null ? word.getDefinition() : candidate.definition());
+                    String easyDescription = hasText(ageDescription)
+                           ? ageDescription
+                           : wordDescriptionService.generate(
+                                   candidate.word(),
+                                   definition,
+                                   ageGroup
+                           );
 
-                    return new WordCandidate(
-                            candidate.candidateId(),
-                            word.getId(),
-                            candidate.word(),
-                            word.getSourceType() != null ? word.getSourceType() : candidate.sourceType(),
-                            candidate.pronunciationScore(),
-                            candidate.contextScore(),
-                            candidate.finalScore(),
-                            resolvedDescription,
-                            word.getImageUrl() != null ? word.getImageUrl() : candidate.imageUrl(),
-                            word.getWordAudioUrl() != null ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
-                            descriptionAudioUrl != null ? descriptionAudioUrl : candidate.descriptionAudioUrl()
+                    WordCandidate enriched = new WordCandidate(
+                           candidate.candidateId(),
+                           word.getId(),
+                           candidate.word(),
+                           word.getSourceType() != null ? word.getSourceType() : candidate.sourceType(),
+                           candidate.pronunciationScore(),
+                           candidate.contextScore(),
+                           candidate.finalScore(),
+                           definition,
+                           hasText(word.getImageUrl()) ? word.getImageUrl() : candidate.imageUrl(),
+                           hasText(word.getWordAudioUrl()) ? word.getWordAudioUrl() : candidate.wordAudioUrl(),
+                           candidate.wordAudioBase64(),
+                           candidate.wordAudioContentType()
                     );
+
+                    return enriched.withEasyDescription(easyDescription);
                 })
                 .toList();
     }
 
     private List<WordCandidate> enrichCandidatesWithTts(
-            List<WordCandidate> candidates,
-            Long childId
+            List<WordCandidate> candidates
     ) {
-        AgeGroup ageGroup = resolveChildAgeGroup(childId);
-
         return candidates.stream()
                 .map(candidate -> {
                     Word existingWord = wordRepository
-                            .findByWord(candidate.word())
-                            .orElse(null);
+                           .findByWord(candidate.word())
+                           .orElse(null);
 
                     if (existingWord != null) {
-                        candidateTtsService.ensureStoredAudio(
-                                existingWord,
-                                ageGroup
-                        );
-
-                        String descriptionKey =
-                                ageGroup == AgeGroup.AGE_3_4
-                                        ? existingWord.getDescriptionAudioAge3To4Url()
-                                        : existingWord.getDescriptionAudioAge5Url();
+                        String audioKey =
+                                candidateTtsService.ensureStoredAudio(existingWord);
 
                         String wordAudioUrl =
-                                candidateTtsService.resolveAudioUrl(
-                                        existingWord.getWordAudioUrl()
+                                candidateTtsService.resolveAudioUrl(audioKey);
+
+                        String imageUrl =
+                                candidateTtsService.resolvePresignedUrl(
+                                        existingWord.getImageUrl()
                                 );
 
-                        String descriptionAudioUrl =
-                                candidateTtsService.resolveAudioUrl(
-                                        descriptionKey
-                                );
-
-                        return new WordCandidate(
-                                candidate.candidateId(),
-                                existingWord.getId(),
-                                candidate.word(),
-                                existingWord.getSourceType(),
-                                candidate.pronunciationScore(),
-                                candidate.contextScore(),
-                                candidate.finalScore(),
-                                candidate.definition(),
-                                candidate.imageUrl(),
-                                wordAudioUrl,
-                                descriptionAudioUrl,
-                                null,
-                                null
-                        );
+                       return candidate.withMedia(
+                               existingWord.getId(),
+                               existingWord.getSourceType(),
+                               imageUrl,
+                               wordAudioUrl,
+                               null,
+                               null
+                       );
                     }
 
                     String wordAudioBase64 =
-                            candidateTtsService.generateBase64IfNeeded(
-                                    candidate.word(),
-                                    null
-                            );
+                           candidateTtsService.generateBase64IfNeeded(
+                                   candidate.word(),
+                                   null
+                           );
+                    String wordAudioContentType = hasText(wordAudioBase64)
+                           ? candidateTtsService.resolveGeneratedAudioContentType()
+                           : null;
 
-                    String descriptionAudioBase64 =
-                            candidateTtsService.generateBase64IfNeeded(
-                                    candidate.definition(),
-                                    null
-                            );
-
-                    return new WordCandidate(
-                            candidate.candidateId(),
-                            candidate.wordId(),
-                            candidate.word(),
-                            candidate.sourceType(),
-                            candidate.pronunciationScore(),
-                            candidate.contextScore(),
-                            candidate.finalScore(),
-                            candidate.definition(),
-                            candidate.imageUrl(),
-                            null,
-                            null,
-                            wordAudioBase64,
-                            descriptionAudioBase64
+                    return candidate.withMedia(
+                           candidate.wordId(),
+                           candidate.sourceType(),
+                           candidate.imageUrl(),
+                           null,
+                           wordAudioBase64,
+                           wordAudioContentType
                     );
                 })
                 .toList();
