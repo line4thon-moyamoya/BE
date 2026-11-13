@@ -67,6 +67,10 @@ services:
       AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       AWS_S3_PREFIX: ${AWS_S3_PREFIX:-prod}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/google-tts.json
+      STDICT_API_KEY: ${STDICT_API_KEY:?Set STDICT_API_KEY}
+      STDICT_BASE_URL: ${STDICT_BASE_URL:-https://stdict.korean.go/kr/api}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       TZ: Asia/Seoul
     volumes:
       - type: bind
