@@ -21,28 +21,42 @@ public class SongTtsService {
 
     byte[] synthesize(String text, SongGenerationMetrics metrics) {
         metrics.inputStarted();
+        byte[] best = null;
+        double bestScore = -1;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new IllegalStateException("노래 TTS 생성이 중단됐습니다.");
             }
             metrics.ttsStarted(attempt);
             byte[] original = metrics.measure(SongGenerationMetrics.Stage.TTS, () -> googleTtsService.synthesize(text));
-            if (metrics.measure(SongGenerationMetrics.Stage.QUALITY, () -> hasAudibleSpeech(original))) {
-                byte[] processed = metrics.measure(SongGenerationMetrics.Stage.PROCESSING,
-                        () -> processorClient.processVoice(original));
-                if (metrics.measure(SongGenerationMetrics.Stage.QUALITY, () -> hasAudibleSpeech(processed))) {
-                    return processed;
-                }
+            var originalQuality = metrics.measure(SongGenerationMetrics.Stage.QUALITY,
+                    () -> inspect(original));
+            byte[] processed = metrics.measure(SongGenerationMetrics.Stage.PROCESSING,
+                    () -> processorClient.processVoice(original));
+            var processedQuality = metrics.measure(SongGenerationMetrics.Stage.QUALITY,
+                    () -> inspect(processed));
+            if (originalQuality.audible() && processedQuality.audible()) {
+                return processed;
+            }
+            if (processedQuality.score() > bestScore) {
+                best = processed;
+                bestScore = processedQuality.score();
             }
             log.warn("노래 TTS 음량 부족. text={}, attempt={}/{}", text, attempt, MAX_ATTEMPTS);
         }
         metrics.exhausted();
-        throw new IllegalStateException("노래 TTS 음량이 너무 작거나 무음입니다.");
+        return best;
     }
 
     static boolean hasAudibleSpeech(byte[] audio) {
+        return inspect(audio).audible();
+    }
+
+    private record Quality(boolean audible, double score) {}
+
+    private static Quality inspect(byte[] audio) {
         if (audio == null || audio.length == 0) {
-            return false;
+            throw new IllegalStateException("노래 TTS 음성 데이터가 비어 있습니다.");
         }
         if (audio.length > MAX_AUDIO_BYTES) {
             throw new IllegalStateException("노래 TTS 음성이 10MB를 초과했습니다.");
@@ -62,6 +76,7 @@ public class SongTtsService {
                 throw new IllegalStateException("노래 TTS 음성이 10MB를 초과했습니다.");
             }
             double audibleSeconds = 0;
+            double score = 0;
             for (int offset = 0; offset < pcm.length; offset += windowBytes) {
                 int end = Math.min(offset + windowBytes, pcm.length);
                 double squareSum = 0;
@@ -71,11 +86,16 @@ public class SongTtsService {
                     squareSum += (double) sample * sample;
                     count++;
                 }
-                if (count > 0 && Math.sqrt(squareSum / count) >= MIN_WINDOW_RMS) {
-                    audibleSeconds += (double) count / format.getChannels() / format.getSampleRate();
+                if (count > 0) {
+                    double duration = (double) count / format.getChannels() / format.getSampleRate();
+                    double rms = Math.sqrt(squareSum / count);
+                    score += Math.min(rms, MIN_WINDOW_RMS) * duration;
+                    if (rms >= MIN_WINDOW_RMS) {
+                        audibleSeconds += duration;
+                    }
                 }
             }
-            return audibleSeconds >= 0.04;
+            return new Quality(audibleSeconds >= 0.04, score);
         } catch (UnsupportedAudioFileException | IOException exception) {
             throw new IllegalStateException("노래 TTS WAV를 읽을 수 없습니다.", exception);
         }

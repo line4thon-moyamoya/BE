@@ -28,7 +28,7 @@ def _prepare_voice(audio: bytes) -> tuple[bytes, float, float]:
     peak = max(levels, default=0)
     active = [i for i, level in enumerate(levels) if level > max(32, peak * 0.1)]
     if not active:
-        raise SongMixError("발화가 감지되지 않은 음성입니다. 개별 단어 TTS를 확인해 주세요.")
+        return audio, 0, 0
     # Keep quiet consonants and a small margin at both ends of the utterance.
     boundaries = [i for i, level in enumerate(levels) if level > max(16, peak * 0.02)]
     start_frame = max(0, boundaries[0] * (frame_size // params.nchannels)
@@ -84,6 +84,8 @@ def mix_song(backing: bytes, voices: list[bytes],
             audio_index, start_sec = placement[:2]
             available = placement[2] if len(placement) == 3 else None
             active_start, active_end = active_ranges[audio_index]
+            if active_end <= active_start:
+                continue
             rate = min(1.6, max(1, (active_end - active_start) / max(0.05, available - 0.04))) \
                 if available is not None else 1
             # Start the quiet consonant before the beat instead of cutting it off.

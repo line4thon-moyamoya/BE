@@ -17,28 +17,66 @@ class SongTtsServiceTest {
     private final SongTtsService service = new SongTtsService(google, processor);
 
     @Test
-    void retriesQuietOriginalWithoutProcessingIt() throws Exception {
+    void retriesQuietOriginalAndUsesPassingProcessedVoice() throws Exception {
         byte[] quiet = wav(0.003, 0.28, 0.28, false);
         byte[] good = wav(0.2, 0.4, 0.32, false);
         when(google.synthesize("우")).thenReturn(quiet, good);
+        when(processor.processVoice(quiet)).thenReturn(quiet);
         when(processor.processVoice(good)).thenReturn(good);
         var metrics = new SongGenerationMetrics();
         assertThat(service.synthesize("우", metrics)).isSameAs(good);
         assertThat(metrics.summary()).contains("inputs=1", "ttsCalls=2", "qualityRetries=1", "exhaustedInputs=0");
         verify(google, times(2)).synthesize("우");
+        verify(processor).processVoice(quiet);
         verify(processor).processVoice(good);
         verifyNoMoreInteractions(processor);
     }
 
     @Test
-    void stopsAfterThreeSilentResults() throws Exception {
-        when(google.synthesize("우")).thenReturn(wav(0, 0.24, 0.24, false));
+    void returnsSilentCandidateAfterThreeAttempts() throws Exception {
+        byte[] silent = wav(0, 0.24, 0.24, false);
+        when(google.synthesize("u")).thenReturn(silent);
+        when(processor.processVoice(silent)).thenReturn(silent);
         var metrics = new SongGenerationMetrics();
-        assertThatIllegalStateException().isThrownBy(() -> service.synthesize("우", metrics));
+        assertThat(service.synthesize("u", metrics)).isSameAs(silent);
         assertThat(metrics.summary()).contains("inputs=1", "ttsCalls=3", "qualityRetries=2",
-                "exhaustedInputs=1", "failedStage=QUALITY");
+                "exhaustedInputs=1", "failedStage=null");
+        verify(google, times(3)).synthesize("u");
+        verify(processor, times(3)).processVoice(silent);
+    }
+
+    @Test
+    void selectsBestProcessedCandidateEvenWhenOriginalIsLouder() throws Exception {
+        byte[] quiet = wav(0.002, 0.3, 0.3, false);
+        byte[] best = wav(0.008, 0.3, 0.3, false);
+        byte[] loud = wav(0.2, 0.3, 0.3, false);
+        byte[] silent = wav(0, 0.3, 0.3, false);
+        when(google.synthesize("u")).thenReturn(quiet, quiet, loud);
+        when(processor.processVoice(quiet)).thenReturn(quiet, best);
+        when(processor.processVoice(loud)).thenReturn(silent);
+        assertThat(service.synthesize("u", new SongGenerationMetrics())).isSameAs(best);
+        verify(google, times(3)).synthesize("u");
+    }
+
+    @Test
+    void prefersSustainedQuietSpeechOverBriefLoudClick() throws Exception {
+        byte[] quiet = wav(0.006, 0.3, 0.3, false);
+        byte[] click = wav(0.8, 0.3, 0.005, false);
+        when(google.synthesize("우")).thenReturn(click, quiet, click);
+        when(processor.processVoice(click)).thenReturn(click);
+        when(processor.processVoice(quiet)).thenReturn(quiet);
+        assertThat(service.synthesize("우", new SongGenerationMetrics())).isSameAs(quiet);
         verify(google, times(3)).synthesize("우");
-        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void doesNotHideProcessingFailureBehindEarlierCandidate() throws Exception {
+        byte[] quiet = wav(0.003, 0.3, 0.3, false);
+        var error = new IllegalStateException("processor unavailable");
+        when(google.synthesize("우")).thenReturn(quiet);
+        when(processor.processVoice(quiet)).thenReturn(quiet).thenThrow(error);
+        assertThatThrownBy(() -> service.synthesize("우", new SongGenerationMetrics())).isSameAs(error);
+        verify(google, times(2)).synthesize("우");
     }
 
     @Test

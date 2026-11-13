@@ -45,7 +45,7 @@ final class SongGenerationMetrics {
                 + ", processingMs=" + millis(Stage.PROCESSING) + ", qualityMs=" + millis(Stage.QUALITY)
                 + ", mixingMs=" + millis(Stage.MIXING) + ", uploadMs=" + millis(Stage.UPLOAD)
                 + ", totalMs=" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
-                + ", failedStage=" + (exhaustedInputs > 0 ? "QUALITY" : failedStage);
+                + ", failedStage=" + failedStage;
     }
 
     private long millis(Stage stage) {
