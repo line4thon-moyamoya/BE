@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 final class SongGenerationMetrics {
-    enum Stage { BACKING, TTS, PROCESSING, QUALITY, MIXING, UPLOAD }
+    enum Stage { BACKING, TTS, PROCESSING, QUALITY, MIXING, UPLOAD, WORD_DOWNLOAD, WORD_UPLOAD }
 
     private final String id = UUID.randomUUID().toString();
     private final long startedAt = System.nanoTime();
@@ -16,6 +16,8 @@ final class SongGenerationMetrics {
     private int qualityRetries;
     private int exhaustedInputs;
     private Stage failedStage;
+    private int cacheHits;
+    private int cacheMisses;
 
     <T> T measure(Stage stage, Supplier<T> action) {
         long start = System.nanoTime();
@@ -37,6 +39,9 @@ final class SongGenerationMetrics {
         }
     }
     void exhausted() { exhaustedInputs++; }
+    int exhaustedInputs() { return exhaustedInputs; }
+    void cacheHit() { cacheHits++; }
+    void cacheMiss() { cacheMisses++; }
 
     String summary() {
         return "mixId=" + id + ", inputs=" + inputs + ", ttsCalls=" + ttsCalls
@@ -44,6 +49,8 @@ final class SongGenerationMetrics {
                 + ", backingMs=" + millis(Stage.BACKING) + ", ttsMs=" + millis(Stage.TTS)
                 + ", processingMs=" + millis(Stage.PROCESSING) + ", qualityMs=" + millis(Stage.QUALITY)
                 + ", mixingMs=" + millis(Stage.MIXING) + ", uploadMs=" + millis(Stage.UPLOAD)
+                + ", cacheHits=" + cacheHits + ", cacheMisses=" + cacheMisses
+                + ", wordDownloadMs=" + millis(Stage.WORD_DOWNLOAD) + ", wordUploadMs=" + millis(Stage.WORD_UPLOAD)
                 + ", totalMs=" + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
                 + ", failedStage=" + failedStage;
     }
