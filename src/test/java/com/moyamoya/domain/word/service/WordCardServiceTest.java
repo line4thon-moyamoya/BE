@@ -7,13 +7,13 @@ import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.question.service.CandidateTtsService;
-import jakarta.persistence.EntityManager;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.LearnedWordRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
+import com.moyamoya.global.s3.S3Service;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,9 +25,11 @@ class WordCardServiceTest {
     private final ChildRepository children = mock(ChildRepository.class);
     private final LearnedWordRepository cards = mock(LearnedWordRepository.class);
     private final CandidateTtsService tts = mock(CandidateTtsService.class);
+    private final S3Service s3Service = mock(S3Service.class);
     private final WordCardService service = new WordCardService(new WordLookupService(children,
             mock(WordRepository.class), cards),
-            new WordDescriptionAudioService(tts, mock(EntityManager.class)));
+            new WordDescriptionAudioService(tts),
+            s3Service);
 
     private Child child(AgeGroup age) {
         User owner = mock(User.class);
@@ -42,18 +44,20 @@ class WordCardServiceTest {
     void selectsAgeSpecificFieldsWithoutChangingNewOrSticker(AgeGroup age) {
         Child child = child(age);
         Word word = Word.createExternal("적금", "기본 뜻", null, "어린 설명", "다섯 살 설명", null,
-                null, "노래", null, "image.png", null, "young.wav", "five.wav");
+                null, null, "image.png", "word.wav");
         LearnedWord card = LearnedWord.create(child, word, true);
-        when(tts.resolveAudioUrl(anyString())).thenAnswer(invocation -> "https://audio.test/" + invocation.getArgument(0));
+        when(tts.resolveAudioUrl("word.wav"))
+                .thenReturn("https://audio.test/word.wav");
+        when(s3Service.getPresignedUrl("image.png")).thenReturn("https://s3.test/presigned/image.png");
         when(cards.findByIdAndChild_Id(35L, 2L)).thenReturn(Optional.of(card));
 
         var result = service.getWordCardDetail(7L, 2L, 35L);
 
         assertThat(result.word()).isEqualTo("적금");
         assertThat(result.description()).isEqualTo(age == AgeGroup.AGE_3_4 ? "어린 설명" : "다섯 살 설명");
-        assertThat(result.descriptionAudioUrl()).isEqualTo("https://audio.test/" + (age == AgeGroup.AGE_3_4 ? "young.wav" : "five.wav"));
-        verify(tts, never()).ensureStoredAudio(any(), any());
-        assertThat(result.imageUrl()).isEqualTo("image.png");
+        assertThat(result.wordAudioUrl()).isEqualTo("https://audio.test/word.wav");
+        verify(tts, never()).ensureStoredAudio(any());
+        assertThat(result.imageUrl()).isEqualTo("https://s3.test/presigned/image.png");
         assertThat(card.isNew()).isTrue();
         assertThat(card.isStickerEarned()).isTrue();
         verify(cards, never()).save(any());
@@ -68,7 +72,7 @@ class WordCardServiceTest {
         var result = service.getWordCardDetail(7L, 2L, 35L);
         assertThat(result.description()).isNull();
         assertThat(result.imageUrl()).isNull();
-        assertThat(result.descriptionAudioUrl()).isNull();
+        assertThat(result.wordAudioUrl()).isNull();
         assertThat(card.isNew()).isFalse();
         assertThat(card.isStickerEarned()).isFalse();
     }

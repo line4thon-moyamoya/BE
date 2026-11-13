@@ -28,11 +28,22 @@ class RepetitionDialogueServiceTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"true,새로운 단어 카드를 받았어! 수첩에서 확인해 봐!", "false,이미 수첩에 있는 단어야!"})
-    void acquisitionUsesNewOrExistingCardText(boolean isNew, String text) {
-        when(tts.synthesize(text)).thenReturn(new byte[]{1});
-        var result = service.acquisition(isNew);
+    @CsvSource({
+            "true,1,false,쿠폰 받았다! 짝짝! 노래까지 네 개 남았어!",
+            "true,2,false,쿠폰 받았다! 짝짝! 노래까지 세 개 남았어!",
+            "true,3,false,쿠폰 받았다! 짝짝! 노래까지 두 개 남았어!",
+            "true,4,false,쿠폰 받았다! 짝짝! 노래까지 한 개 남았어!",
+            "true,0,true,쿠폰 다섯 장을 다 모았어!",
+            "true,2,true,쿠폰 다섯 장을 다 모았어!",
+            "false,0,false,이미 수첩에 있는 단어야!",
+            "false,4,false,이미 수첩에 있는 단어야!"
+    })
+    void acquisitionUsesCouponCountAndRegistrationResult(boolean isNew, long count, boolean registered, String text) {
+        byte[] wav = {82, 73, 70, 70, 1};
+        when(tts.synthesize(text)).thenReturn(wav);
+        var result = service.acquisition(isNew, count, registered);
         assertThat(result.text()).isEqualTo(text);
+        assertThat(Base64.getDecoder().decode(result.audioBase64())).isEqualTo(wav);
         assertThat(result.audioContentType()).isEqualTo("audio/wav");
         verify(tts).synthesize(text);
     }
@@ -50,9 +61,9 @@ class RepetitionDialogueServiceTest {
     void emptyOrNullAudioKeepsTextWithNullAudio() {
         when(tts.synthesize(anyString())).thenReturn(new byte[0], (byte[]) null);
         var first = service.repetition("적금", true);
-        var second = service.acquisition(true);
+        var second = service.acquisition(true, 1, false);
         assertThat(first.text()).isEqualTo("우와! 적금! 잘했어!");
-        assertThat(second.text()).isEqualTo("새로운 단어 카드를 받았어! 수첩에서 확인해 봐!");
+        assertThat(second.text()).isEqualTo("쿠폰 받았다! 짝짝! 노래까지 네 개 남았어!");
         assertThat(first.audioBase64()).isNull();
         assertThat(first.audioContentType()).isNull();
         assertThat(second.audioBase64()).isNull();
@@ -64,6 +75,17 @@ class RepetitionDialogueServiceTest {
         when(tts.synthesize("우와! 적금! 잘했어!")).thenThrow(new IllegalStateException("TTS unavailable"));
         when(tts.synthesize("이미 수첩에 있는 단어야!")).thenReturn(new byte[]{1, 2});
         assertThat(service.repetition("적금", true).audioBase64()).isNull();
-        assertThat(service.acquisition(false).audioBase64()).isEqualTo("AQI=");
+        assertThat(service.acquisition(false, 2, false).audioBase64()).isEqualTo("AQI=");
+    }
+
+    @Test
+    void acquisitionTtsFailureKeepsFiveCouponText() {
+        when(tts.synthesize(anyString())).thenThrow(new IllegalStateException("TTS unavailable"));
+
+        var result = service.acquisition(true, 0, true);
+
+        assertThat(result.text()).isEqualTo("쿠폰 다섯 장을 다 모았어!");
+        assertThat(result.audioBase64()).isNull();
+        assertThat(result.audioContentType()).isNull();
     }
 }

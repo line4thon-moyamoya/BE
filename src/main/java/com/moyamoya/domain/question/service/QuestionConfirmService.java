@@ -15,7 +15,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.word.repository.QuestionHistoryRepository;
 import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -35,8 +35,9 @@ public class QuestionConfirmService {
     private final WordRepository wordRepository;
     private final QuestionHistoryRepository questionHistoryRepository;
     private final CandidateTtsService candidateTtsService;
-    private final S3AudioService s3AudioService;
+    private final S3Service s3Service;
     private final TransactionTemplate transactionTemplate;
+    private final WordDescriptionService wordDescriptionService;
 
     public ConfirmWordResponse confirmWord(
             Long userId,
@@ -90,15 +91,23 @@ public class QuestionConfirmService {
                 Word word = wordRepository.findByWord(candidate.word())
                         .orElseGet(() -> createExternalWord(candidate, child));
 
+                // 기존 설명은 유지하고 누락된 연령 설명만 생성, 저장
+                fillMissingAgeDescriptions(
+                        word,
+                        candidate,
+                        child.getAgeGroup()
+                );
+
                 // 음성이 없는 경우 S3 저장
                 // 기존 단어는 이미 저장된 음성 재사용
+                String audioKey;
+
                 try {
-                    candidateTtsService.ensureStoredAudio(
-                            word,
-                            child.getAgeGroup()
-                    );
+                    audioKey = candidateTtsService.ensureStoredAudio(word);
                 } catch (IllegalArgumentException | IllegalStateException e) {
-                    throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
+                    throw new CustomException(
+                            QuestionErrorCode.TTS_GENERATION_FAILED
+                    );
                 }
 
                 // 질문 기록 저장 (기본/외부 단어 공통)
@@ -109,33 +118,30 @@ public class QuestionConfirmService {
                 );
                 questionHistoryRepository.save(history);
 
-                boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
-                String descriptionKey = age3To4
-                        ? word.getDescriptionAudioAge3To4Url()
-                        : word.getDescriptionAudioAge5Url();
-
                 String wordAudioUrl;
-                String descriptionAudioUrl;
+                String imageUrl;
                 try {
-                    wordAudioUrl = candidateTtsService.resolveAudioUrl(
-                            word.getWordAudioUrl()
-                    );
+                    wordAudioUrl = candidateTtsService.resolveAudioUrl(audioKey);
 
-                    descriptionAudioUrl = candidateTtsService.resolveAudioUrl(
-                            descriptionKey
+                    imageUrl = candidateTtsService.resolvePresignedUrl(
+                            word.getImageUrl()
                     );
                 } catch (RuntimeException exception) {
                     throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
                 }
 
+                // 아이 연령에 맞는 쉬운 설명 선택
+                String ageDescription = child.getAgeGroup() == AgeGroup.AGE_3_4
+                        ? word.getDescAge3To4()
+                        : word.getDescAge5();
+
                 return new ConfirmWordResponse(
                         "CONFIRMED",
                         word.getId(),
                         word.getWord(),
-                        candidate.definition(),
-                        word.getImageUrl(),
+                        ageDescription,
+                        imageUrl,
                         wordAudioUrl,
-                        descriptionAudioUrl,
                         "WORD_LEARNING"
                 );
             });
@@ -165,45 +171,48 @@ public class QuestionConfirmService {
             WordCandidate candidate,
             Child child
     ) {
-        String description = candidate.definition();
+        String definition = candidate.definition();
 
-        if (!StringUtils.hasText(description)) {
+        if (!StringUtils.hasText(definition)) {
             throw new CustomException(
                     QuestionErrorCode.INVALID_QUESTION_REQUEST
             );
         }
 
-        boolean age3To4 = child.getAgeGroup() == AgeGroup.AGE_3_4;
+        AgeGroup ageGroup = child.getAgeGroup();
 
-        // 후보 단계에서 만든 Base64를 재사용해 S3 업로드
+        // 후보 단계에서 생성한 쉬운 설명 재사용
+        String easyDescription = candidate.easyDescription();
+
+        // 현재 아이 연령에 해당하는 설명만 우선 설정
+        String descAge3To4 =
+                ageGroup == AgeGroup.AGE_3_4
+                        ? easyDescription
+                        : null;
+
+        String descAge5 =
+                ageGroup == AgeGroup.AGE_5
+                        ? easyDescription
+                        : null;
+
+        // 후보 단계에서 생성한 Base64 음성을 S3에 영구 저장
         String wordKey = uploadCandidateAudio(
                 candidate.wordAudioBase64(),
-                "word",
-                candidate.word()
+                "word"
         );
 
-        String descriptionKey = uploadCandidateAudio(
-                candidate.descriptionAudioBase64(),
-                age3To4 ? "desc-age-3-4" : "desc-age-5",
-                candidate.word()
-        );
-
-        // 현재 후보에 없는 상세 메타데이터는 임시로 null 처리
-        // songDescription은 NOT NULL이므로 정의를 임시 사용
+        // 사전 정의와 쉬운 설명을 분리하여 저장
         Word newWord = Word.createExternal(
                 candidate.word(),
-                description,
+                definition,
                 null,
-                age3To4 ? description : null,
-                age3To4 ? null : description,
+                descAge3To4,
+                descAge5,
                 null,
                 null,
-                description,
                 null,
                 candidate.imageUrl(),
-                wordKey,
-                age3To4 ? descriptionKey : null,
-                age3To4 ? null : descriptionKey
+                wordKey
         );
 
         return wordRepository.save(newWord);
@@ -212,8 +221,7 @@ public class QuestionConfirmService {
     // Base64 WAV를 S3에 업로드하고 객체 키 반환
     private String uploadCandidateAudio(
             String audioBase64,
-            String type,
-            String word
+            String type
     ) {
         if (!StringUtils.hasText(audioBase64)) {
             return null;
@@ -231,7 +239,7 @@ public class QuestionConfirmService {
                 + "/" + type + ".wav";
 
         try {
-            return s3AudioService.uploadWav(key, wav);
+            return s3Service.uploadWav(key, wav);
         } catch (IllegalArgumentException | IllegalStateException exception) {
             throw new CustomException(QuestionErrorCode.TTS_GENERATION_FAILED);
         }
@@ -245,5 +253,61 @@ public class QuestionConfirmService {
                     QuestionErrorCode.INVALID_SESSION_ID
             );
         }
+    }
+
+    // 현재 아이 연령에 해당하는 설명만 생성 및 저장
+    private void fillMissingAgeDescriptions(
+            Word word,
+            WordCandidate candidate,
+            AgeGroup childAgeGroup
+    ) {
+        String definition = word.getDefinition();
+
+        if (definition == null || definition.isBlank()) {
+            return;
+        }
+
+        String descAge3To4 = word.getDescAge3To4();
+        String descAge5 = word.getDescAge5();
+
+        // 3~4세 아이인 경우
+        if (childAgeGroup == AgeGroup.AGE_3_4) {
+
+            if (descAge3To4 == null || descAge3To4.isBlank()) {
+
+                // 후보 단계에서 생성한 설명 재사용
+                descAge3To4 = candidate.easyDescription();
+
+                // 후보 설명이 없을 때만 새로 생성
+                if (descAge3To4 == null || descAge3To4.isBlank()) {
+                    descAge3To4 = wordDescriptionService.generate(
+                            word.getWord(),
+                            definition,
+                            AgeGroup.AGE_3_4
+                    );
+                }
+            }
+
+        // 5세 이상 아이인 경우
+        } else if (childAgeGroup == AgeGroup.AGE_5) {
+
+            if (descAge5 == null || descAge5.isBlank()) {
+
+                // 후보 단계에서 생성한 설명 재사용
+                descAge5 = candidate.easyDescription();
+
+                // 후보 설명이 없을 때만 새로 생성
+                if (descAge5 == null || descAge5.isBlank()) {
+                    descAge5 = wordDescriptionService.generate(
+                            word.getWord(),
+                            definition,
+                            AgeGroup.AGE_5
+                    );
+                }
+            }
+        }
+
+        // 기존 설명은 유지하고 누락된 값만 저장
+        word.fillMissingDescriptions(descAge3To4, descAge5);
     }
 }

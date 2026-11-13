@@ -2,8 +2,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import Response
 
 from audio_processor import process_audio
+from song_router import router as song_router
 
 app = FastAPI(title="Moyamoya TTS Processor")
+app.include_router(song_router)
 
 
 @app.post("/process")

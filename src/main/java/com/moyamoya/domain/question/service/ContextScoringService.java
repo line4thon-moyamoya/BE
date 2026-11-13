@@ -85,6 +85,29 @@ public class ContextScoringService {
         ) ? 1.0 : 0.0;
     }
 
+    public boolean hasMeaningfulContext(
+            String originalText,
+            QuestionWordData data
+    ) {
+        Set<String> tokens = tokenize(originalText);
+
+        tokens.removeAll(tokenize(data.word()));
+        tokens.removeAll(tokenize(data.matchKey()));
+
+        return !tokens.isEmpty()
+                && (
+                hasText(data.hint())
+                        || hasText(data.example())
+                        || hasText(data.hearsExample())
+                        || hasText(data.category())
+                        || hasText(data.heardNote())
+        );
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     // 입력 문장과 메타데이터 간 키워드 일치율
     private double overlap(
             Set<String> inputTokens,

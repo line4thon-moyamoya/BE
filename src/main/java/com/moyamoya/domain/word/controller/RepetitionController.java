@@ -28,12 +28,8 @@ public class RepetitionController {
     private final RepetitionService repetitionService;
 
     @Operation(summary = "따라 말하기 결과 및 카드 획득 처리",
-            description = "음성을 STT로 변환하고 유사도 0.8 이상을 성공으로 판정합니다. "
-                    + "등록된 허용 발음은 인정하며 다른 등록 단어와의 일치는 실패로 처리합니다. "
-                    + "실패·무응답도 신규 카드를 저장하며, 성공 시 스티커를 반영합니다. "
-                    + "카드 처리 후 결과·획득 안내 대사와 Base64 WAV 음성(audio/wav)을 반환합니다. "
-                    + "TTS 실패 시 대사와 카드 처리 결과는 유지하고 음성 두 필드는 null로 반환합니다. "
-                    + "STT 및 안내별 TTS 외부 호출 비용이 발생합니다. 쿠폰·노래 연동은 후속 작업입니다.",
+            description = "아이의 음성을 인식해 따라 말하기 결과를 판정하고 카드 획득을 처리합니다. "
+                    + "쿠폰 현황, 노래 등록 정보와 결과별 안내 대사 및 음성을 반환합니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "판정 및 카드 처리 완료"),

@@ -54,7 +54,6 @@ public class WordSeeder implements ApplicationRunner {
                     data.descAge5(),
                     data.example(),
                     data.hint(),
-                    data.songLine(),
                     heardFrom
             );
 

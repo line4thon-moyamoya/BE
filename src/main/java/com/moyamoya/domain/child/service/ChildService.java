@@ -1,8 +1,10 @@
 package com.moyamoya.domain.child.service;
 
 import com.moyamoya.domain.child.dto.request.CreateChildRequest;
+import com.moyamoya.domain.child.dto.request.InitialChildProfileRequest;
 import com.moyamoya.domain.child.dto.request.UpdateChildRequest;
 import com.moyamoya.domain.child.dto.response.ChildResponse;
+import com.moyamoya.domain.child.dto.response.InitialChildProfileResponse;
 import com.moyamoya.domain.child.entity.AgeGroup;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.entity.MoyaType;
@@ -21,6 +23,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChildService {
     private final UserRepository userRepository;
     private final ChildRepository childRepository;
+
+    @Transactional
+    public InitialChildProfileResponse setupInitialProfile(Long userId, Long childId, InitialChildProfileRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(SecurityErrorCode.AUTHENTICATION_REQUIRED));
+        Child child = childRepository.findById(childId)
+                .orElseThrow(() -> new CustomException(ChildErrorCode.CHILD_NOT_FOUND));
+        if (!child.getUser().getId().equals(user.getId())) {
+            throw new CustomException(ChildErrorCode.UPDATE_FORBIDDEN);
+        }
+        if (request == null || request.moyaType() == null) {
+            throw new CustomException(ChildErrorCode.INVALID_MOYA_TYPE);
+        }
+        MoyaType moyaType = parseMoyaType(request.moyaType());
+        child.updateMoyaType(moyaType);
+        return new InitialChildProfileResponse(child.getId(), moyaType);
+    }
 
     @Transactional
     public void updateChild(Long userId, Long childId, UpdateChildRequest request) {

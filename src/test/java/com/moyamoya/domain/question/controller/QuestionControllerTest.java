@@ -75,7 +75,6 @@ class QuestionControllerTest {
                         null,
                         "https://example.com/word-audio",
                         null,
-                        "https://example.com/description-audio",
                         null
                 )),
                 new QuestionCandidateResponse.Dialogue("적금 말하는 거야?", null, "base64-audio", "audio/wav"),
@@ -120,8 +119,7 @@ class QuestionControllerTest {
                                 null,
                                 null,
                                 "base64-word",
-                                null,
-                                "base64-desc"
+                                "audio/wav"
                         )),
                         new SecondCandidateResponse.Dialogue(
                                 "예금 말하는 거야?",
@@ -159,7 +157,6 @@ class QuestionControllerTest {
                         "은행에 매달 정해진 돈을 넣어서 크게 모으는 거야.",
                         null,
                         "https://example.com/word-audio",
-                        "https://example.com/description-audio",
                         "WORD_LEARNING"
                 ));
 

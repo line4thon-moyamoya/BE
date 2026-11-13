@@ -12,7 +12,7 @@ import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
 import com.moyamoya.global.exception.CustomException;
-import com.moyamoya.global.s3.S3AudioService;
+import com.moyamoya.global.s3.S3Service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
@@ -36,7 +36,7 @@ class WordRequestSaveServiceTest {
 
     private QuestionSessionStore sessionStore;
     private QuestionAudioTempService audioTempService;
-    private S3AudioService s3AudioService;
+    private S3Service s3Service;
     private WordRequestRepository wordRequestRepository;
     private ChildRepository childRepository;
     private TransactionTemplate transactionTemplate;
@@ -47,7 +47,7 @@ class WordRequestSaveServiceTest {
     void setUp() {
         sessionStore = mock(QuestionSessionStore.class);
         audioTempService = mock(QuestionAudioTempService.class);
-        s3AudioService = mock(S3AudioService.class);
+        s3Service = mock(S3Service.class);
         wordRequestRepository = mock(WordRequestRepository.class);
         childRepository = mock(ChildRepository.class);
         transactionTemplate = mock(TransactionTemplate.class);
@@ -61,7 +61,7 @@ class WordRequestSaveServiceTest {
         wordRequestSaveService = new WordRequestSaveService(
                 sessionStore,
                 audioTempService,
-                s3AudioService,
+                s3Service,
                 wordRequestRepository,
                 childRepository,
                 transactionTemplate
@@ -106,7 +106,7 @@ class WordRequestSaveServiceTest {
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.INVALID_AUDIO_FILE);
 
-        verify(s3AudioService, never()).uploadAudio(any(), any(), any());
+        verify(s3Service, never()).uploadAudio(any(), any(), any());
         verify(wordRequestRepository, never()).save(any());
     }
 
@@ -126,7 +126,7 @@ class WordRequestSaveServiceTest {
         when(audioTempService.read(session.getOriginalAudioTempPath())).thenReturn(bytes);
 
         String expectedKey = "questions/original/2/" + sessionId + "." + extension;
-        when(s3AudioService.uploadAudio(
+        when(s3Service.uploadAudio(
                 eq(expectedKey),
                 eq(bytes),
                 eq(contentType)
@@ -145,7 +145,7 @@ class WordRequestSaveServiceTest {
         assertThat(response.wordRequestId()).isEqualTo(11L);
         assertThat(response.status()).isEqualTo("PENDING");
 
-        verify(s3AudioService).uploadAudio(expectedKey, bytes, contentType);
+        verify(s3Service).uploadAudio(expectedKey, bytes, contentType);
         verify(sessionStore).deleteTempAudio(session);
     }
 

@@ -38,6 +38,7 @@ class QuestionServiceTest {
 
     private QuestionTargetExtractor targetExtractor;
     private JosaCandidateGenerator josaGenerator;
+    private CandidateSearchService candidateSearchService;
     private CandidateRankingService rankingService;
     private SttService sttService;
     private CandidateTtsService candidateTtsService;
@@ -48,15 +49,21 @@ class QuestionServiceTest {
     private UserRepository userRepository;
     private QuestionAudioTempService audioTempService;
     private QuestionService questionService;
+    private WordDescriptionService wordDescriptionService;
 
     @BeforeEach
     void setUp() {
         targetExtractor = mock(QuestionTargetExtractor.class);
         josaGenerator = mock(JosaCandidateGenerator.class);
+        candidateSearchService = mock(CandidateSearchService.class);
         rankingService = mock(CandidateRankingService.class);
         sttService = mock(SttService.class);
         candidateTtsService = mock(CandidateTtsService.class);
         moyaTtsService = mock(MoyaTtsService.class);
+
+        // 신규 추가: 연령별 쉬운 설명 생성 서비스
+        wordDescriptionService = mock(WordDescriptionService.class);
+
         sessionStore = mock(QuestionSessionStore.class);
         wordRepository = mock(WordRepository.class);
         childRepository = mock(ChildRepository.class);
@@ -66,10 +73,12 @@ class QuestionServiceTest {
         questionService = new QuestionService(
                 targetExtractor,
                 josaGenerator,
+                candidateSearchService,
                 rankingService,
                 sttService,
                 candidateTtsService,
                 moyaTtsService,
+                wordDescriptionService,
                 sessionStore,
                 wordRepository,
                 childRepository,
@@ -87,7 +96,7 @@ class QuestionServiceTest {
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
         when(josaGenerator.generate("데금이"))
                 .thenReturn(List.of("데금이", "데금"));
-        when(rankingService.rankFirst(List.of("데금이", "데금")))
+        when(candidateSearchService.searchFirstCandidates(List.of("데금이", "데금")))
                 .thenReturn(List.of(new WordCandidate(
                         "CURATED:세금",
                         null,
@@ -97,6 +106,7 @@ class QuestionServiceTest {
                         0.0,
                         0.92,
                         "기존정의",
+                        null,
                         null,
                         null,
                         null
@@ -110,12 +120,18 @@ class QuestionServiceTest {
         when(word.getDefinition()).thenReturn("나라에 내는 돈");
         when(word.getDescAge3To4()).thenReturn("나라에 내는 돈(3-4)");
         when(word.getSourceType()).thenReturn(WordSourceType.CURATED);
+        when(word.getImageUrl()).thenReturn("words/images/42.png");
         when(word.getWordAudioUrl())
                 .thenReturn("words/audio/42/word.wav");
         when(candidateTtsService.resolveAudioUrl(
                 "words/audio/42/word.wav"
         )).thenReturn("https://audio.example/word.wav");
+        when(candidateTtsService.resolvePresignedUrl(
+                "words/images/42.png"
+        )).thenReturn("https://image.example/42.png");
         when(wordRepository.findByWord("세금")).thenReturn(Optional.of(word));
+        when(candidateTtsService.ensureStoredAudio(word))
+                .thenReturn("words/audio/42/word.wav");
 
         var response = questionService.testStt(1L, "엄마, 데금이 뭐야?");
 
@@ -124,6 +140,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().description()).isEqualTo("나라에 내는 돈(3-4)");
         assertThat(response.candidates().getFirst().wordAudioUrl())
                 .isEqualTo("https://audio.example/word.wav");
+        assertThat(response.candidates().getFirst().imageUrl())
+                .isEqualTo("https://image.example/42.png");
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
         assertThat(response.dialogue()).isNotNull();
         assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
@@ -144,6 +162,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -158,18 +177,24 @@ class QuestionServiceTest {
                 "정의2",
                 null,
                 null,
+                null,
                 null
         ));
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,
                 Set.of("CURATED:적금")
         )).thenReturn(secondCandidates);
         when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+        when(wordDescriptionService.generate(
+                "연금",
+                "정의2",
+                AgeGroup.AGE_3_4
+        )).thenReturn("나중에 쓸 돈을 조금씩 받는 거야.");
 
         var response = questionService.findSecondCandidates(
                 1L,
@@ -182,6 +207,8 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
         assertThat(response.dialogue()).isNotNull();
         assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
+        assertThat(response.candidates().getFirst().description())
+                .isEqualTo("나중에 쓸 돈을 조금씩 받는 거야.");
     }
 
     @Test
@@ -190,7 +217,7 @@ class QuestionServiceTest {
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
         when(josaGenerator.generate("데금이"))
                 .thenReturn(List.of("데금이", "데금"));
-        when(rankingService.rankFirst(List.of("데금이", "데금")))
+        when(candidateSearchService.searchFirstCandidates(List.of("데금이", "데금")))
                 .thenReturn(List.of(new WordCandidate(
                         "CURATED:세금",
                         null,
@@ -200,6 +227,7 @@ class QuestionServiceTest {
                         0.0,
                         0.92,
                         "기존정의",
+                        null,
                         null,
                         null,
                         null
@@ -232,6 +260,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -246,18 +275,18 @@ class QuestionServiceTest {
                 "정의2",
                 null,
                 null,
+                null,
                 null
         ));
 
         Word existingWord = mock(Word.class);
-        when(existingWord.getDescriptionAudioAge3To4Url()).thenReturn("desc-key");
         when(existingWord.getWordAudioUrl()).thenReturn("word-key");
         when(existingWord.getId()).thenReturn(100L);
         when(existingWord.getSourceType()).thenReturn(WordSourceType.CURATED);
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,
@@ -267,7 +296,7 @@ class QuestionServiceTest {
         when(candidateTtsService.resolveAudioUrl(any())).thenReturn("https://audio.example");
         org.mockito.Mockito.doThrow(new IllegalStateException("tts failed"))
                 .when(candidateTtsService)
-                .ensureStoredAudio(any(), any());
+                .ensureStoredAudio(any());
 
         assertThatThrownBy(() -> questionService.findSecondCandidates(
                 1L,
@@ -294,6 +323,7 @@ class QuestionServiceTest {
                 "정의",
                 null,
                 null,
+                null,
                 null
         )));
 
@@ -308,12 +338,13 @@ class QuestionServiceTest {
                 "정의2",
                 null,
                 null,
+                null,
                 null
         ));
 
         when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
         stubChildOwnership(1L, 1L);
-        when(rankingService.rankSecond(
+        when(candidateSearchService.searchSecondCandidates(
                 List.of("저끔"),
                 "엄마 저끔이 뭐야?",
                 HeardFrom.PARENTS,

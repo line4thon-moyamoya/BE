@@ -14,7 +14,6 @@ import org.hibernate.type.SqlTypes;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.TemporalAdjusters;
 
 @Entity
 @Table(
@@ -55,17 +54,17 @@ public class WeeklyReport {
             LocalDate weekStartDate,
             String reportData
     ) {
+        if (weekStartDate == null
+                || weekStartDate.getDayOfWeek() != DayOfWeek.MONDAY) {
+            throw new CustomException(
+                    WeeklyReportErrorCode.REPORT_INVALID_WEEK
+            );
+        }
+
         WeeklyReport report = new WeeklyReport();
         report.child = child;
-        report.weekStartDate = normalizeWeekStartDate(weekStartDate);
+        report.weekStartDate = weekStartDate;
         report.reportData = reportData;
         return report;
-    }
-
-    private static LocalDate normalizeWeekStartDate(LocalDate date) {
-        if (date == null) {
-            throw new CustomException(WeeklyReportErrorCode.REPORT_INVALID_WEEK);
-        }
-        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 }

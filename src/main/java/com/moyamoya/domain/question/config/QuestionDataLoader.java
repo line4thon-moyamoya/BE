@@ -86,8 +86,7 @@ public class QuestionDataLoader {
                         value(record, "hint"),
                         value(record, "desc_age_3_4"),
                         value(record, "desc_age_5"),
-                        value(record, "example"),
-                        value(record, "song_line")
+                        value(record, "example")
                 ));
             }
         }

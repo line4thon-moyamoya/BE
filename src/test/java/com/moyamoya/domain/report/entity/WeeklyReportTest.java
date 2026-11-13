@@ -11,14 +11,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class WeeklyReportTest {
 
     @Test
-    void createNormalizesDateToMondayOfSameWeek() {
-        WeeklyReport report = WeeklyReport.create(null, LocalDate.of(2026, 11, 4), "{\"summary\":\"ok\"}");
-
-        assertThat(report.getWeekStartDate()).isEqualTo(LocalDate.of(2026, 11, 2));
+    void createRejectsNonMondayWeekStartDate() {
+        assertThatThrownBy(() -> WeeklyReport.create(
+                null,
+                LocalDate.of(2026, 11, 4),
+                "{\"summary\":\"ok\"}"
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasMessage("올바르지 않은 주차입니다.");
     }
 
     @Test
-    void createKeepsMondayAsIs() {
+    void createAcceptsMondayWeekStartDate() {
         WeeklyReport report = WeeklyReport.create(null, LocalDate.of(2026, 11, 2), "{\"summary\":\"ok\"}");
 
         assertThat(report.getWeekStartDate()).isEqualTo(LocalDate.of(2026, 11, 2));

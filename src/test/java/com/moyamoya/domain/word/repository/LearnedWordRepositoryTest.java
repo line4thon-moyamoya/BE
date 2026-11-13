@@ -13,6 +13,7 @@ import com.moyamoya.domain.word.entity.Word;
 import com.moyamoya.domain.wordbook.dto.response.LearnedWordResponse;
 import com.moyamoya.domain.wordbook.service.WordbookService;
 import com.moyamoya.global.exception.CustomException;
+import com.moyamoya.global.s3.S3Service;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,12 +26,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class LearnedWordRepositoryTest {
     @Mock private ChildRepository childRepository;
     @Mock private LearnedWordRepository repository;
+    @Mock private S3Service s3Service;
     private WordbookService service;
     private Child child;
 
     @BeforeEach
     void setUp() {
-        service = new WordbookService(childRepository, repository);
+        service = new WordbookService(childRepository, repository, s3Service);
         User user = mock(User.class);
         when(user.getId()).thenReturn(7L);
         child = Child.create(user, "지우", AgeGroup.AGE_5);
