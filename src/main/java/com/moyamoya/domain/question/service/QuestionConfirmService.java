@@ -5,6 +5,7 @@ import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.exception.ChildErrorCode;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.question.dto.response.ConfirmWordResponse;
+import com.moyamoya.domain.question.model.OtherMeaning;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.question.session.QuestionSession;
@@ -23,6 +24,7 @@ import org.springframework.util.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -42,7 +44,8 @@ public class QuestionConfirmService {
     public ConfirmWordResponse confirmWord(
             Long userId,
             String sessionId,
-            String candidateId
+            String candidateId,
+            String meaningId
     ) {
         if (userId == null || !StringUtils.hasText(candidateId)) {
             throw new CustomException(
@@ -87,9 +90,46 @@ public class QuestionConfirmService {
                     ));
 
             ConfirmWordResponse response = transactionTemplate.execute(status -> {
+                Optional<Word> existingWord = wordRepository.findByWord(
+                        candidate.word()
+                );
+
+                if (existingWord.isPresent()
+                        && StringUtils.hasText(meaningId)) {
+                    throw new CustomException(
+                            QuestionErrorCode.OTHER_MEANINGS_NOT_ALLOWED
+                    );
+                }
+
                 // 기존 단어 재사용 또는 신규 외부 단어 생성
-                Word word = wordRepository.findByWord(candidate.word())
-                        .orElseGet(() -> createExternalWord(candidate, child));
+                Word word = existingWord.orElseGet(() -> {
+                    String definition = candidate.definition();
+                    String easyDescription = candidate.easyDescription();
+
+                    if (StringUtils.hasText(meaningId)) {
+                        OtherMeaning meaning = session
+                                .findOtherMeaning(candidateId, meaningId)
+                                .orElseThrow(() -> new CustomException(
+                                        QuestionErrorCode.INVALID_CANDIDATE
+                                ));
+
+                        definition = meaning.definition();
+                        easyDescription = meaning.description();
+                    }
+
+                    return createExternalWord(
+                            candidate,
+                            child,
+                            definition,
+                            easyDescription
+                    );
+                });
+
+                if (meaningId != null && !StringUtils.hasText(meaningId)) {
+                    throw new CustomException(
+                            QuestionErrorCode.INVALID_QUESTION_REQUEST
+                    );
+                }
 
                 // 기존 설명은 유지하고 누락된 연령 설명만 생성, 저장
                 fillMissingAgeDescriptions(
@@ -169,10 +209,10 @@ public class QuestionConfirmService {
     // 신규 외부 단어만 DB에 생성
     private Word createExternalWord(
             WordCandidate candidate,
-            Child child
+            Child child,
+            String definition,
+            String easyDescription
     ) {
-        String definition = candidate.definition();
-
         if (!StringUtils.hasText(definition)) {
             throw new CustomException(
                     QuestionErrorCode.INVALID_QUESTION_REQUEST
@@ -180,9 +220,6 @@ public class QuestionConfirmService {
         }
 
         AgeGroup ageGroup = child.getAgeGroup();
-
-        // 후보 단계에서 생성한 쉬운 설명 재사용
-        String easyDescription = candidate.easyDescription();
 
         // 현재 아이 연령에 해당하는 설명만 우선 설정
         String descAge3To4 =
@@ -263,51 +300,39 @@ public class QuestionConfirmService {
     ) {
         String definition = word.getDefinition();
 
-        if (definition == null || definition.isBlank()) {
+        if (!StringUtils.hasText(definition)) {
             return;
         }
 
-        String descAge3To4 = word.getDescAge3To4();
-        String descAge5 = word.getDescAge5();
+        String description = childAgeGroup == AgeGroup.AGE_3_4
+                ? word.getDescAge3To4()
+                : word.getDescAge5();
 
-        // 3~4세 아이인 경우
-        if (childAgeGroup == AgeGroup.AGE_3_4) {
-
-            if (descAge3To4 == null || descAge3To4.isBlank()) {
-
-                // 후보 단계에서 생성한 설명 재사용
-                descAge3To4 = candidate.easyDescription();
-
-                // 후보 설명이 없을 때만 새로 생성
-                if (descAge3To4 == null || descAge3To4.isBlank()) {
-                    descAge3To4 = wordDescriptionService.generate(
-                            word.getWord(),
-                            definition,
-                            AgeGroup.AGE_3_4
-                    );
-                }
-            }
-
-        // 5세 이상 아이인 경우
-        } else if (childAgeGroup == AgeGroup.AGE_5) {
-
-            if (descAge5 == null || descAge5.isBlank()) {
-
-                // 후보 단계에서 생성한 설명 재사용
-                descAge5 = candidate.easyDescription();
-
-                // 후보 설명이 없을 때만 새로 생성
-                if (descAge5 == null || descAge5.isBlank()) {
-                    descAge5 = wordDescriptionService.generate(
-                            word.getWord(),
-                            definition,
-                            AgeGroup.AGE_5
-                    );
-                }
-            }
+        // 기존 설명이 있으면 수정하지 않음
+        if (StringUtils.hasText(description)) {
+            return;
         }
 
-        // 기존 설명은 유지하고 누락된 값만 저장
-        word.fillMissingDescriptions(descAge3To4, descAge5);
+        // 후보의 정의와 저장된 Word 정의가 일치할 때만 재사용
+        String easyDescription = null;
+
+        if (definition.equals(candidate.definition())) {
+            easyDescription = candidate.easyDescription();
+        }
+
+        // 후보 설명을 사용할 수 없다면 저장된 정의로 새로 생성
+        if (!StringUtils.hasText(easyDescription)) {
+            easyDescription = wordDescriptionService.generate(
+                    word.getWord(),
+                    definition,
+                    childAgeGroup
+            );
+        }
+
+        if (childAgeGroup == AgeGroup.AGE_3_4) {
+            word.fillMissingDescriptions(easyDescription, null);
+        } else if (childAgeGroup == AgeGroup.AGE_5) {
+            word.fillMissingDescriptions(null, easyDescription);
+        }
     }
 }

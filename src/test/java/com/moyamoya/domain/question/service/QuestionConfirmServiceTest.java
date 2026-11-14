@@ -102,7 +102,8 @@ class QuestionConfirmServiceTest {
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_999"
+                "c_999",
+                null
         ))
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
@@ -142,7 +143,8 @@ class QuestionConfirmServiceTest {
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         ))
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
@@ -198,7 +200,8 @@ class QuestionConfirmServiceTest {
         questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         );
 
         verify(wordDescriptionService).generate(
@@ -253,7 +256,8 @@ class QuestionConfirmServiceTest {
         var response = questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         );
 
         assertThat(session.getStatus())

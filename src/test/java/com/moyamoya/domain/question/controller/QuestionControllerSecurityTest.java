@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.dto.response.WordRequestSaveResponse;
 import com.moyamoya.domain.question.service.QuestionConfirmService;
+import com.moyamoya.domain.question.service.QuestionOtherMeaningService;
 import com.moyamoya.domain.question.service.QuestionService;
 import com.moyamoya.domain.question.service.WordRequestSaveService;
 import com.moyamoya.global.config.SecurityConfig;
@@ -61,6 +62,11 @@ class QuestionControllerSecurityTest {
         @Bean
         WordRequestSaveService wordRequestSaveService() {
             return org.mockito.Mockito.mock(WordRequestSaveService.class);
+        }
+
+        @Bean
+        QuestionOtherMeaningService questionOtherMeaningService() {
+            return org.mockito.Mockito.mock(QuestionOtherMeaningService.class);
         }
 
         @Bean

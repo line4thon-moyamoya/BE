@@ -250,7 +250,8 @@ public class QuestionController {
             """;
     private static final String CONFIRM_REQUEST_EXAMPLE = """
             {
-              "candidateId": "c_001"
+              "candidateId": "c_001",
+              "meaningId": "m_001"
             }
             """;
     private static final String CONFIRM_SUCCESS_EXAMPLE = """
@@ -721,7 +722,8 @@ public class QuestionController {
         ConfirmWordResponse response = questionConfirmService.confirmWord(
                 userId,
                 sessionId,
-                request.candidateId()
+                request.candidateId(),
+                request.meaningId()
         );
 
         return ResponseEntity.ok(

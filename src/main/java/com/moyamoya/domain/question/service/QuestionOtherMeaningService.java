@@ -14,6 +14,7 @@ import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.question.session.QuestionSession;
 import com.moyamoya.domain.question.session.QuestionSessionStatus;
 import com.moyamoya.domain.question.session.QuestionSessionStore;
+import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class QuestionOtherMeaningService {
     private final QuestionSessionStore sessionStore;
     private final ChildRepository childRepository;
     private final ExternalDictionaryService dictionaryService;
+    private final WordRepository wordRepository;
     private final OpenAiClient openAiClient;
     private final WordDescriptionService descriptionService;
     private final ObjectMapper objectMapper;
@@ -115,6 +117,12 @@ public class QuestionOtherMeaningService {
                             && "EXTERNAL".equals(candidate.sourceType().name());
 
             if (!allowed) {
+                throw new CustomException(
+                        QuestionErrorCode.OTHER_MEANINGS_NOT_ALLOWED
+                );
+            }
+
+            if (wordRepository.existsByWord(candidate.word())) {
                 throw new CustomException(
                         QuestionErrorCode.OTHER_MEANINGS_NOT_ALLOWED
                 );

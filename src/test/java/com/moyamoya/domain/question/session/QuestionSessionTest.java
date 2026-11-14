@@ -1,5 +1,6 @@
 package com.moyamoya.domain.question.session;
 
+import com.moyamoya.domain.question.model.OtherMeaning;
 import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.word.entity.HeardFrom;
 import com.moyamoya.domain.word.entity.WordSourceType;
@@ -11,6 +12,51 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class QuestionSessionTest {
+
+    // 다른 뜻을 캐싱하고 meaningId로 조회할 수 있는지 확인
+    @Test
+    void shouldCacheAndFindOtherMeaning() {
+        QuestionSession session = createSession();
+
+        // 신규 EXTERNAL 후보 등록
+        WordCandidate candidate = new WordCandidate(
+                "external-1",
+                null,
+                "머리",
+                WordSourceType.EXTERNAL,
+                0.8,
+                0.8,
+                0.8,
+                "사람이나 동물의 목 위 부분",
+                null,
+                null,
+                null,
+                null
+        );
+
+        session.setFirstCandidates(List.of(candidate));
+
+        // 다른 뜻 캐싱
+        session.cacheOtherMeanings(
+                "c_001",
+                List.of(new OtherMeaning(
+                        "m_001",
+                        "생각하고 판단하는 능력",
+                        "무언가를 생각하고 결정하는 힘이야."
+                ))
+        );
+
+        // 공개 ID로 다른 뜻 조회
+        OtherMeaning result = session
+                .findOtherMeaning("c_001", "m_001")
+                .orElseThrow();
+
+        assertThat(result.definition())
+                .isEqualTo("생각하고 판단하는 능력");
+
+        assertThat(result.description())
+                .isEqualTo("무언가를 생각하고 결정하는 힘이야.");
+    }
 
     // 1차 후보가 없으면 FIRST_NO_CANDIDATES
     @Test
