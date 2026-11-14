@@ -44,7 +44,10 @@ public record QuestionCandidateResponse(
         };
 
         List<CandidateResponse> candidates = sourceCandidates.stream()
-                .map(CandidateResponse::from)
+                .map(candidate -> CandidateResponse.from(
+                        candidate,
+                        sourceCandidates.size()
+                ))
                 .toList();
 
         boolean found = session.getStatus() == QuestionSessionStatus.FIRST_CANDIDATES_READY

@@ -30,45 +30,63 @@ public class CandidateSearchService {
     private static final double F2_MIN_PRONUNCIATION_SCORE = 0.45;
     private static final double F2_MIN_FINAL_SCORE = 0.50;
 
+    private static final double F1_MIN_RESULT_SCORE = 0.65;
+    private static final double F1_STRONG_SCORE = 0.90;
+    private static final double F1_STRONG_GAP = 0.12;
+    private static final double F1_ADDITIONAL_GAP = 0.15;
+
+    private static final double F2_STRONG_SCORE = 0.85;
+    private static final double F2_STRONG_GAP = 0.15;
+    private static final double F2_ADDITIONAL_GAP = 0.18;
+
     private final CandidateRankingService rankingService;
     private final WordRepository wordRepository;
     private final ExternalDictionaryService externalDictionaryService;
     private final PronunciationVariantGenerator pronunciationVariantGenerator;
 
-    public List<WordCandidate> searchFirstCandidates(List<String> targetExpressions) {
-        List<WordCandidate> curatedCandidates = rankingService.rankFirst(targetExpressions);
-        List<WordCandidate> storedExternalCandidates = searchStoredExternalCandidates(
+    public List<WordCandidate> searchFirstCandidates(
+            List<String> targetExpressions
+    ) {
+        List<WordCandidate> curatedCandidates =
+                rankingService.rankFirst(targetExpressions);
+
+        List<WordCandidate> storedExternalCandidates =
+                searchStoredExternalCandidates(
+                        targetExpressions,
+                        null,
+                        null,
+                        null,
+                        true
+                );
+
+        List<WordCandidate> existingCandidates =
+                mergeUniqueCandidates(
+                        curatedCandidates,
+                        storedExternalCandidates
+                );
+
+        List<WordCandidate> dictionaryCandidates =
+                shouldTriggerExternalSearch(existingCandidates)
+                        ? searchNewDictionaryCandidates(
+                        targetExpressions,
+                        null,
+                        null,
+                        null,
+                        true
+                )
+                        : List.of();
+
+        List<WordCandidate> allCandidates =
+                mergeUniqueCandidates(
+                        existingCandidates,
+                        dictionaryCandidates
+                );
+
+        return selectFinalCandidates(
+                allCandidates,
                 targetExpressions,
-                null,
-                null,
-                null,
                 true
         );
-        List<WordCandidate> existingCandidates = mergeUniqueCandidates(
-                curatedCandidates,
-                storedExternalCandidates
-        );
-
-        if (!shouldTriggerExternalSearch(existingCandidates)) {
-            return existingCandidates.stream()
-                    .limit(3)
-                    .toList();
-        }
-
-        List<WordCandidate> dictionaryCandidates = searchNewDictionaryCandidates(
-                targetExpressions,
-                null,
-                null,
-                null,
-                true
-        );
-
-        return mergeUniqueCandidates(
-                existingCandidates,
-                dictionaryCandidates
-        ).stream()
-                .limit(3)
-                .toList();
     }
 
     public List<WordCandidate> searchSecondCandidates(
@@ -103,12 +121,17 @@ public class CandidateSearchService {
                 false
         );
 
-        return mergeUniqueCandidates(
-                existingCandidates,
-                dictionaryCandidates
-        ).stream()
-                .limit(3)
-                .toList();
+        List<WordCandidate> allCandidates =
+                mergeUniqueCandidates(
+                        existingCandidates,
+                        dictionaryCandidates
+                );
+
+        return selectFinalCandidates(
+                allCandidates,
+                targetExpressions,
+                false
+        );
     }
 
     public boolean shouldTriggerExternalSearch(List<WordCandidate> candidates) {
@@ -430,5 +453,95 @@ public class CandidateSearchService {
 
     private String normalizeKey(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private List<WordCandidate> selectFinalCandidates(
+            List<WordCandidate> candidates,
+            List<String> targetExpressions,
+            boolean isFirstPass
+    ) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+
+        double minScore = isFirstPass
+                ? F1_MIN_RESULT_SCORE
+                : F2_MIN_FINAL_SCORE;
+
+        // 1. 최소 점수 이상인 후보만 선정
+        List<WordCandidate> ranked = candidates.stream()
+                .filter(Objects::nonNull)
+                .filter(candidate -> candidate.finalScore() >= minScore)
+                .sorted(
+                        Comparator.comparingDouble(
+                                        WordCandidate::finalScore
+                                ).reversed()
+                                .thenComparing(
+                                        Comparator.comparingDouble(
+                                                WordCandidate::pronunciationScore
+                                        ).reversed()
+                                )
+                                .thenComparing(WordCandidate::word)
+                )
+                .toList();
+
+        if (ranked.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. F1: 조사 제거 후 표제어 정확 일치 우선
+        if (isFirstPass && targetExpressions != null) {
+            List<WordCandidate> exactMatches = ranked.stream()
+                    .filter(candidate ->
+                            targetExpressions.stream()
+                                    .filter(Objects::nonNull)
+                                    .map(String::trim)
+                                    .anyMatch(expression ->
+                                            expression.equals(candidate.word())
+                                    )
+                    )
+                    .toList();
+
+            if (!exactMatches.isEmpty()) {
+                return exactMatches.stream()
+                        .limit(3)
+                        .toList();
+            }
+        }
+
+        // 3. 후보가 하나뿐이라면 그대로 반환
+        if (ranked.size() == 1) {
+            return List.of(ranked.get(0));
+        }
+
+        WordCandidate best = ranked.get(0);
+        WordCandidate second = ranked.get(1);
+
+        double strongScore = isFirstPass
+                ? F1_STRONG_SCORE
+                : F2_STRONG_SCORE;
+
+        double strongGap = isFirstPass
+                ? F1_STRONG_GAP
+                : F2_STRONG_GAP;
+
+        // 4. 1위가 확실히 우세하면 하나만 반환
+        if (best.finalScore() >= strongScore
+                && best.finalScore() - second.finalScore() >= strongGap) {
+            return List.of(best);
+        }
+
+        // 5. 1위와 점수 차이가 작은 후보만 추가
+        double additionalGap = isFirstPass
+                ? F1_ADDITIONAL_GAP
+                : F2_ADDITIONAL_GAP;
+
+        return ranked.stream()
+                .filter(candidate ->
+                        best.finalScore() - candidate.finalScore()
+                                <= additionalGap
+                )
+                .limit(3)
+                .toList();
     }
 }

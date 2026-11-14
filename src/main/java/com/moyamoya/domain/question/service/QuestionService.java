@@ -1,5 +1,6 @@
 package com.moyamoya.domain.question.service;
 
+import com.moyamoya.domain.question.dto.response.CandidateResponse;
 import com.moyamoya.domain.question.dto.response.QuestionCandidateResponse;
 import com.moyamoya.domain.question.dto.response.SecondCandidateResponse;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
@@ -172,7 +173,10 @@ public class QuestionService {
             if (!candidatesWithTts.isEmpty()) {
                 String dialogueText = QuestionCandidateResponse.buildDialogue(
                         candidatesWithTts.stream()
-                                .map(com.moyamoya.domain.question.dto.response.CandidateResponse::from)
+                                .map(candidate -> CandidateResponse.from(
+                                        candidate,
+                                        candidatesWithTts.size()
+                                ))
                                 .toList()
                 );
                 try {
@@ -268,7 +272,16 @@ public class QuestionService {
             return response;
         }
 
-        String dialogueText = QuestionCandidateResponse.buildDialogue(response.candidates());
+
+        String dialogueText = QuestionCandidateResponse.buildDialogue(
+                candidatesWithTts.stream()
+                        .map(candidate -> CandidateResponse.from(
+                                candidate,
+                                candidatesWithTts.size()
+                        ))
+                        .toList()
+        );
+
         String dialogueAudioBase64;
         try {
             byte[] dialogueAudio = moyaTtsService.synthesize(dialogueText);
