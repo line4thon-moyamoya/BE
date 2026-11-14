@@ -64,19 +64,33 @@ public class SongTtsService {
             }
             int windowFrames = Math.max(1, Math.round(format.getSampleRate() * 0.02f));
             int windowBytes = windowFrames * format.getFrameSize();
+            int shortWindowSamples = Math.max(1, Math.round(format.getSampleRate() * 0.005f))
+                    * format.getChannels();
             byte[] pcm = stream.readNBytes(MAX_AUDIO_BYTES + 1);
             if (pcm.length > MAX_AUDIO_BYTES) {
                 throw new IllegalStateException("노래 TTS 음성이 10MB를 초과했습니다.");
             }
-            double audibleSeconds = 0;
+            long audibleSamples = 0;
             double score = 0;
             for (int offset = 0; offset < pcm.length; offset += windowBytes) {
                 int end = Math.min(offset + windowBytes, pcm.length);
                 double squareSum = 0;
                 int count = 0;
+                double shortSquareSum = 0;
+                int shortCount = 0;
+                int windowAudibleSamples = 0;
                 for (int index = offset; index + 1 < end; index += 2) {
                     int sample = (short) ((pcm[index] & 0xff) | (pcm[index + 1] << 8));
                     squareSum += (double) sample * sample;
+                    shortSquareSum += (double) sample * sample;
+                    shortCount++;
+                    if (shortCount == shortWindowSamples || index + 3 >= end) {
+                        if (Math.sqrt(shortSquareSum / shortCount) >= MIN_WINDOW_RMS) {
+                            windowAudibleSamples += shortCount;
+                        }
+                        shortSquareSum = 0;
+                        shortCount = 0;
+                    }
                     count++;
                 }
                 if (count > 0) {
@@ -84,11 +98,12 @@ public class SongTtsService {
                     double rms = Math.sqrt(squareSum / count);
                     score += Math.min(rms, MIN_WINDOW_RMS) * duration;
                     if (rms >= MIN_WINDOW_RMS) {
-                        audibleSeconds += duration;
+                        audibleSamples += windowAudibleSamples;
                     }
                 }
             }
-            return new Quality(audibleSeconds >= 0.04, score);
+            return new Quality(audibleSamples >= Math.ceil(0.04 * format.getSampleRate())
+                    * format.getChannels(), score);
         } catch (UnsupportedAudioFileException | IOException exception) {
             throw new IllegalStateException("노래 TTS WAV를 읽을 수 없습니다.", exception);
         }

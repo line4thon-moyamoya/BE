@@ -10,6 +10,8 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class SongTtsServiceTest {
     private final SongGoogleTtsService google = mock(SongGoogleTtsService.class);
@@ -117,12 +119,51 @@ class SongTtsServiceTest {
         verifyNoInteractions(processor);
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = {0, 0.004, 0.018, 0.019, 0.039})
+    void rejectsBriefClicksAndRetriesEvenAcrossWindowBoundary(double start) throws Exception {
+        byte[] click = wav(0.8, 0.3, 0.005, false, start);
+        assertThat(SongTtsService.hasAudibleSpeech(click)).isFalse();
+        when(google.synthesize("우")).thenReturn(click);
+        when(processor.processVoice(click)).thenReturn(click);
+        var result = service.synthesize("우");
+        assertThat(result.qualityPassed()).isFalse();
+        verify(google, times(3)).synthesize("우");
+        verify(processor, times(3)).processVoice(click);
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {0, 0.018, 0.019})
+    void acceptsShortLowVolumeSignalWithoutRetrying(double start) throws Exception {
+        byte[] voice = wav(0.016, 0.3, 0.05, false, start);
+        assertThat(SongTtsService.hasAudibleSpeech(voice)).isTrue();
+        when(google.synthesize("우")).thenReturn(voice);
+        when(processor.processVoice(voice)).thenReturn(voice);
+        var result = service.synthesize("우");
+        assertThat(result.qualityPassed()).isTrue();
+        assertThat(result.audio()).isSameAs(voice);
+        verify(google).synthesize("우");
+        verify(processor).processVoice(voice);
+    }
+
+    @Test
+    void acceptsShortSignalAtMinimumDuration() throws Exception {
+        assertThat(SongTtsService.hasAudibleSpeech(wav(0.2, 0.3, 0.04, false))).isTrue();
+    }
+
     private byte[] wav(double amplitude, double duration, double activeDuration, boolean noise) throws Exception {
+        return wav(amplitude, duration, activeDuration, noise, 0);
+    }
+
+    private byte[] wav(double amplitude, double duration, double activeDuration, boolean noise,
+            double start) throws Exception {
         int rate = 24000;
         int frames = (int) (rate * duration);
         byte[] pcm = new byte[frames * 2];
         var random = new java.util.Random(1);
-        for (int i = 0; i < frames && i < rate * activeDuration; i++) {
+        int first = (int) Math.round(rate * start);
+        int end = Math.min(frames, first + (int) Math.round(rate * activeDuration));
+        for (int i = first; i < end; i++) {
             double value = noise ? random.nextDouble() * 2 - 1 : Math.sin(2 * Math.PI * 440 * i / rate);
             short sample = (short) (32767 * amplitude * value);
             pcm[i * 2] = (byte) sample;
