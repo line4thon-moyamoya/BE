@@ -2,6 +2,7 @@ package com.moyamoya.domain.song.service;
 
 import com.moyamoya.domain.song.model.SongAudioPlacement;
 import com.moyamoya.domain.song.repository.SongWordAudioRepository;
+import com.moyamoya.domain.word.entity.Word;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +24,18 @@ public class SongWordAudioService {
     private final SongAudioStorageService storage;
     private final Object[] locks = IntStream.range(0, 64).mapToObj(index -> new Object()).toArray();
 
+    public void prepare(String text) {
+        synchronized (locks[Math.floorMod(text.hashCode(), locks.length)]) {
+            var word = words.findByWord(text).orElse(null);
+            if (word == null || storage.isCurrentWordKey(word.getId(), text, word.getSongAudioUrl())) {
+                return;
+            }
+            var metrics = new SongGenerationMetrics();
+            metrics.cacheMiss();
+            create(text, word, metrics, new LinkedHashMap<>());
+        }
+    }
+
     byte[] getOrCreate(String text, SongGenerationMetrics metrics, Map<String, Voice> syllables) {
         synchronized (locks[Math.floorMod(text.hashCode(), locks.length)]) {
             return loadOrCreate(text, metrics, syllables);
@@ -41,6 +54,11 @@ public class SongWordAudioService {
             }
         }
         metrics.cacheMiss();
+        return create(text, word, metrics, syllables);
+    }
+
+    private byte[] create(String text, Word word, SongGenerationMetrics metrics, Map<String, Voice> syllables) {
+        String previous = word == null ? null : word.getSongAudioUrl();
         var plan = planner.planWord(text);
         var indexes = new LinkedHashMap<String, Integer>();
         var voices = new ArrayList<byte[]>();

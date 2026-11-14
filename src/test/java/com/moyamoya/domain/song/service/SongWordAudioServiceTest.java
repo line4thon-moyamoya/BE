@@ -79,8 +79,9 @@ class SongWordAudioServiceTest {
         assertThat(metrics.summary()).contains("cacheHits=1", "ttsCalls=0");
     }
 
-    @Test
-    void concurrentRequestsGenerateRegisteredWordOnlyOnce() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void preparationAndSongMixingGenerateRegisteredWordOnlyOnce(boolean prepareFirst) throws Exception {
         generatedAudio();
         var savedKey = new java.util.concurrent.atomic.AtomicReference<String>();
         when(word.getSongAudioUrl()).thenAnswer(invocation -> savedKey.get());
@@ -98,9 +99,21 @@ class SongWordAudioServiceTest {
             return syllable;
         });
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-            var first = executor.submit(() -> service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>()));
+            var first = executor.submit(() -> {
+                if (prepareFirst) {
+                    service.prepare("학교");
+                    return clip;
+                }
+                return service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
+            });
             assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            var second = executor.submit(() -> service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>()));
+            var second = executor.submit(() -> {
+                if (!prepareFirst) {
+                    service.prepare("학교");
+                    return clip;
+                }
+                return service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
+            });
             release.countDown();
             assertThat(first.get(5, java.util.concurrent.TimeUnit.SECONDS)).isSameAs(clip);
             assertThat(second.get(5, java.util.concurrent.TimeUnit.SECONDS)).isSameAs(clip);
@@ -109,6 +122,41 @@ class SongWordAudioServiceTest {
         }
         verify(mixer).composeWord(anyList(), anyList());
         verify(storage).uploadWord(7L, "학교", clip);
+    }
+
+    @Test
+    void preparationReusesCurrentKeyWithoutDownloadingOrSynthesizing() {
+        when(word.getSongAudioUrl()).thenReturn("saved");
+        when(storage.isCurrentWordKey(7L, "학교", "saved")).thenReturn(true);
+        service.prepare("학교");
+        verify(storage, never()).downloadWord(anyString());
+        verifyNoInteractions(tts, mixer);
+    }
+
+    @Test
+    void preparationDoesNotGenerateDeletedOrUnregisteredWord() {
+        service.prepare("unregistered");
+        verifyNoInteractions(tts, mixer, storage);
+    }
+
+    @Test
+    void preparationSavesMissingWordAudio() {
+        generatedAudio();
+        service.prepare("학교");
+        verify(storage).uploadWord(7L, "학교", clip);
+        verify(words).replaceAudioKey(7L, "학교", null, "saved");
+    }
+
+    @Test
+    void preparationDoesNotPersistQualityFallback() {
+        generatedAudio();
+        when(tts.synthesize(eq("교"), any())).thenAnswer(invocation -> {
+            invocation.<SongGenerationMetrics>getArgument(1).exhausted();
+            return syllable;
+        });
+        service.prepare("학교");
+        verify(storage, never()).uploadWord(any(), anyString(), any());
+        verify(words, never()).replaceAudioKey(any(), anyString(), any(), anyString());
     }
 
     @Test
