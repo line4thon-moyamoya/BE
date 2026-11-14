@@ -34,9 +34,7 @@ class SongWordAudioServiceTest {
         when(word.getSongAudioUrl()).thenReturn("key");
         when(storage.isCurrentWordKey(7L, "학교", "key")).thenReturn(true);
         when(storage.downloadWord("key")).thenReturn(clip);
-        var metrics = new SongGenerationMetrics();
-        assertThat(service.getOrCreate("학교", metrics, new LinkedHashMap<>())).isSameAs(clip);
-        assertThat(metrics.summary()).contains("cacheHits=1", "cacheMisses=0", "ttsCalls=0");
+        assertThat(service.getOrCreate("학교", new LinkedHashMap<>())).isSameAs(clip);
         verifyNoInteractions(tts, mixer);
         verify(words, never()).replaceAudioKey(any(), anyString(), any(), anyString());
     }
@@ -44,11 +42,11 @@ class SongWordAudioServiceTest {
     @Test
     void savesWordClipWithOriginalInternalBeatsAndReusesSharedSyllables() {
         generatedAudio();
-        var shared = new LinkedHashMap<String, SongWordAudioService.Voice>();
-        assertThat(service.getOrCreate("학교", new SongGenerationMetrics(), shared)).isSameAs(clip);
-        assertThat(service.getOrCreate("교", new SongGenerationMetrics(), shared)).isSameAs(clip);
-        verify(tts).synthesize(eq("학"), any());
-        verify(tts).synthesize(eq("교"), any());
+        var shared = new LinkedHashMap<String, SongTtsService.Result>();
+        assertThat(service.getOrCreate("학교", shared)).isSameAs(clip);
+        assertThat(service.getOrCreate("교", shared)).isSameAs(clip);
+        verify(tts).synthesize("학");
+        verify(tts).synthesize("교");
         verifyNoMoreInteractions(tts);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SongAudioPlacement>> plans = ArgumentCaptor.forClass(List.class);
@@ -71,12 +69,10 @@ class SongWordAudioServiceTest {
         });
         when(storage.isCurrentWordKey(7L, "학교", "saved")).thenReturn(true);
         when(storage.downloadWord("saved")).thenReturn(clip);
-        service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
-        var metrics = new SongGenerationMetrics();
-        assertThat(service.getOrCreate("학교", metrics, new LinkedHashMap<>())).isSameAs(clip);
+        service.getOrCreate("학교", new LinkedHashMap<>());
+        assertThat(service.getOrCreate("학교", new LinkedHashMap<>())).isSameAs(clip);
         verify(mixer).composeWord(anyList(), anyList());
         verify(storage).uploadWord(7L, "학교", clip);
-        assertThat(metrics.summary()).contains("cacheHits=1", "ttsCalls=0");
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -93,10 +89,10 @@ class SongWordAudioServiceTest {
         when(storage.downloadWord("saved")).thenReturn(clip);
         var entered = new java.util.concurrent.CountDownLatch(1);
         var release = new java.util.concurrent.CountDownLatch(1);
-        when(tts.synthesize(eq("학"), any())).thenAnswer(invocation -> {
+        when(tts.synthesize("학")).thenAnswer(invocation -> {
             entered.countDown();
             assertThat(release.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            return syllable;
+            return new SongTtsService.Result(syllable, true);
         });
         try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
             var first = executor.submit(() -> {
@@ -104,7 +100,7 @@ class SongWordAudioServiceTest {
                     service.prepare("학교");
                     return clip;
                 }
-                return service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
+                return service.getOrCreate("학교", new LinkedHashMap<>());
             });
             assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             var second = executor.submit(() -> {
@@ -112,7 +108,7 @@ class SongWordAudioServiceTest {
                     service.prepare("학교");
                     return clip;
                 }
-                return service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
+                return service.getOrCreate("학교", new LinkedHashMap<>());
             });
             release.countDown();
             assertThat(first.get(5, java.util.concurrent.TimeUnit.SECONDS)).isSameAs(clip);
@@ -150,10 +146,7 @@ class SongWordAudioServiceTest {
     @Test
     void preparationDoesNotPersistQualityFallback() {
         generatedAudio();
-        when(tts.synthesize(eq("교"), any())).thenAnswer(invocation -> {
-            invocation.<SongGenerationMetrics>getArgument(1).exhausted();
-            return syllable;
-        });
+        when(tts.synthesize("교")).thenReturn(new SongTtsService.Result(syllable, false));
         service.prepare("학교");
         verify(storage, never()).uploadWord(any(), anyString(), any());
         verify(words, never()).replaceAudioKey(any(), anyString(), any(), anyString());
@@ -164,7 +157,7 @@ class SongWordAudioServiceTest {
         generatedAudio();
         when(word.getSongAudioUrl()).thenReturn("old-version");
         when(words.replaceAudioKey(7L, "학교", "old-version", "saved")).thenReturn(1);
-        service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>());
+        service.getOrCreate("학교", new LinkedHashMap<>());
         verify(storage, never()).downloadWord(anyString());
         verify(words).replaceAudioKey(7L, "학교", "old-version", "saved");
     }
@@ -176,7 +169,7 @@ class SongWordAudioServiceTest {
         when(storage.isCurrentWordKey(7L, "학교", "missing")).thenReturn(true);
         when(storage.downloadWord("missing")).thenReturn(null);
         when(words.replaceAudioKey(7L, "학교", "missing", "saved")).thenReturn(1);
-        assertThat(service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>())).isSameAs(clip);
+        assertThat(service.getOrCreate("학교", new LinkedHashMap<>())).isSameAs(clip);
         verify(words).replaceAudioKey(7L, "학교", "missing", "saved");
     }
 
@@ -184,13 +177,10 @@ class SongWordAudioServiceTest {
     void exhaustedSyllableIsUsedButNeverPersistedEvenWhenSharedWithAnotherWord() {
         generatedAudio();
         when(words.findByWord("교")).thenReturn(Optional.of(word));
-        when(tts.synthesize(eq("교"), any())).thenAnswer(invocation -> {
-            invocation.<SongGenerationMetrics>getArgument(1).exhausted();
-            return syllable;
-        });
-        var shared = new LinkedHashMap<String, SongWordAudioService.Voice>();
-        assertThat(service.getOrCreate("학교", new SongGenerationMetrics(), shared)).isSameAs(clip);
-        assertThat(service.getOrCreate("교", new SongGenerationMetrics(), shared)).isSameAs(clip);
+        when(tts.synthesize("교")).thenReturn(new SongTtsService.Result(syllable, false));
+        var shared = new LinkedHashMap<String, SongTtsService.Result>();
+        assertThat(service.getOrCreate("학교", shared)).isSameAs(clip);
+        assertThat(service.getOrCreate("교", shared)).isSameAs(clip);
         verify(storage, never()).uploadWord(any(), anyString(), any());
         verify(words, never()).replaceAudioKey(any(), anyString(), any(), anyString());
     }
@@ -199,7 +189,7 @@ class SongWordAudioServiceTest {
     void removesOnlyOwnUploadWhenAnotherWriterWins() {
         generatedAudio();
         when(words.replaceAudioKey(7L, "학교", null, "saved")).thenReturn(0);
-        assertThat(service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>())).isSameAs(clip);
+        assertThat(service.getOrCreate("학교", new LinkedHashMap<>())).isSameAs(clip);
         verify(storage).deleteWord("saved");
     }
 
@@ -208,7 +198,7 @@ class SongWordAudioServiceTest {
         generatedAudio();
         var failure = new IllegalStateException("database failed");
         when(words.replaceAudioKey(7L, "학교", null, "saved")).thenThrow(failure);
-        assertThatThrownBy(() -> service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>()))
+        assertThatThrownBy(() -> service.getOrCreate("학교", new LinkedHashMap<>()))
                 .isSameAs(failure);
         verify(storage).deleteWord("saved");
     }
@@ -219,7 +209,7 @@ class SongWordAudioServiceTest {
         when(storage.isCurrentWordKey(7L, "학교", "key")).thenReturn(true);
         var failure = new IllegalStateException("S3 unavailable");
         when(storage.downloadWord("key")).thenThrow(failure);
-        assertThatThrownBy(() -> service.getOrCreate("학교", new SongGenerationMetrics(), new LinkedHashMap<>()))
+        assertThatThrownBy(() -> service.getOrCreate("학교", new LinkedHashMap<>()))
                 .isSameAs(failure);
         verifyNoInteractions(tts, mixer);
     }
@@ -227,14 +217,14 @@ class SongWordAudioServiceTest {
     @Test
     void longWordIsSpokenWholeWithoutTempoCompression() {
         generatedAudio();
-        service.getOrCreate("어린이보호구역", new SongGenerationMetrics(), new LinkedHashMap<>());
-        verify(tts).synthesize(eq("어린이보호구역"), any());
+        service.getOrCreate("어린이보호구역", new LinkedHashMap<>());
+        verify(tts).synthesize("어린이보호구역");
         verify(mixer).composeWord(List.of(syllable), List.of(new SongAudioPlacement(0, 0, null)));
         verify(storage, never()).uploadWord(any(), anyString(), any());
     }
 
     private void generatedAudio() {
-        when(tts.synthesize(anyString(), any())).thenReturn(syllable);
+        when(tts.synthesize(anyString())).thenReturn(new SongTtsService.Result(syllable, true));
         when(mixer.composeWord(anyList(), anyList())).thenReturn(clip);
         when(storage.uploadWord(7L, "학교", clip)).thenReturn("saved");
         when(words.replaceAudioKey(7L, "학교", null, "saved")).thenReturn(1);

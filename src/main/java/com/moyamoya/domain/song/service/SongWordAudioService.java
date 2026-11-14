@@ -15,8 +15,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class SongWordAudioService {
-    record Voice(byte[] audio, boolean cacheable) {}
-
     private final SongWordAudioRepository words;
     private final SongSpeechPlanner planner;
     private final SongTtsService tts;
@@ -30,34 +28,29 @@ public class SongWordAudioService {
             if (word == null || storage.isCurrentWordKey(word.getId(), text, word.getSongAudioUrl())) {
                 return;
             }
-            var metrics = new SongGenerationMetrics();
-            metrics.cacheMiss();
-            create(text, word, metrics, new LinkedHashMap<>());
+            create(text, word, new LinkedHashMap<>());
         }
     }
 
-    byte[] getOrCreate(String text, SongGenerationMetrics metrics, Map<String, Voice> syllables) {
+    byte[] getOrCreate(String text, Map<String, SongTtsService.Result> syllables) {
         synchronized (locks[Math.floorMod(text.hashCode(), locks.length)]) {
-            return loadOrCreate(text, metrics, syllables);
+            return loadOrCreate(text, syllables);
         }
     }
 
-    private byte[] loadOrCreate(String text, SongGenerationMetrics metrics, Map<String, Voice> syllables) {
+    private byte[] loadOrCreate(String text, Map<String, SongTtsService.Result> syllables) {
         var word = words.findByWord(text).orElse(null);
         String previous = word == null ? null : word.getSongAudioUrl();
         if (word != null && storage.isCurrentWordKey(word.getId(), text, previous)) {
-            byte[] cached = metrics.measure(SongGenerationMetrics.Stage.WORD_DOWNLOAD,
-                    () -> storage.downloadWord(previous));
+            byte[] cached = storage.downloadWord(previous);
             if (cached != null) {
-                metrics.cacheHit();
                 return cached;
             }
         }
-        metrics.cacheMiss();
-        return create(text, word, metrics, syllables);
+        return create(text, word, syllables);
     }
 
-    private byte[] create(String text, Word word, SongGenerationMetrics metrics, Map<String, Voice> syllables) {
+    private byte[] create(String text, Word word, Map<String, SongTtsService.Result> syllables) {
         String previous = word == null ? null : word.getSongAudioUrl();
         var plan = planner.planWord(text);
         var indexes = new LinkedHashMap<String, Integer>();
@@ -69,11 +62,7 @@ public class SongWordAudioService {
             var speech = plan.get(index);
             Integer audioIndex = indexes.get(speech.text());
             if (audioIndex == null) {
-                Voice voice = syllables.computeIfAbsent(speech.text(), key -> {
-                    int exhaustedBefore = metrics.exhaustedInputs();
-                    byte[] audio = tts.synthesize(key, metrics);
-                    return new Voice(audio, exhaustedBefore == metrics.exhaustedInputs());
-                });
+                var voice = syllables.computeIfAbsent(speech.text(), tts::synthesize);
                 if (voice.audio() == null || voice.audio().length == 0 || voice.audio().length > 10 * 1024 * 1024) {
                     throw new IllegalStateException("단어 TTS 음성 데이터가 올바르지 않습니다.");
                 }
@@ -81,7 +70,7 @@ public class SongWordAudioService {
                 if (totalBytes > 50L * 1024 * 1024) {
                     throw new IllegalStateException("단어 노래 음원 요청 크기가 50MB를 초과했습니다.");
                 }
-                cacheable &= voice.cacheable();
+                cacheable &= voice.qualityPassed();
                 audioIndex = voices.size();
                 indexes.put(speech.text(), audioIndex);
                 voices.add(voice.audio());
@@ -91,15 +80,14 @@ public class SongWordAudioService {
                     : Math.rint((next - speech.startSec()) * 1000) / 1000;
             placements.add(new SongAudioPlacement(audioIndex, speech.startSec(), available));
         }
-        byte[] clip = metrics.measure(SongGenerationMetrics.Stage.MIXING, () -> mixer.composeWord(voices, placements));
+        byte[] clip = mixer.composeWord(voices, placements);
         if (clip == null || clip.length == 0 || clip.length > 10 * 1024 * 1024) {
             throw new IllegalStateException("단어 노래 음원 크기가 올바르지 않습니다.");
         }
         if (word == null || !cacheable) {
             return clip;
         }
-        String key = metrics.measure(SongGenerationMetrics.Stage.WORD_UPLOAD,
-                () -> storage.uploadWord(word.getId(), text, clip));
+        String key = storage.uploadWord(word.getId(), text, clip);
         try {
             if (words.replaceAudioKey(word.getId(), text, previous, key) == 0) {
                 deleteUnused(key);

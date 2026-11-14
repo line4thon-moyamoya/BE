@@ -6,10 +6,8 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SongTtsService {
@@ -19,33 +17,28 @@ public class SongTtsService {
     private final SongGoogleTtsService googleTtsService;
     private final PythonSongMixerClient processorClient;
 
-    byte[] synthesize(String text, SongGenerationMetrics metrics) {
-        metrics.inputStarted();
+    record Result(byte[] audio, boolean qualityPassed) {}
+
+    Result synthesize(String text) {
         byte[] best = null;
         double bestScore = -1;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new IllegalStateException("노래 TTS 생성이 중단됐습니다.");
             }
-            metrics.ttsStarted(attempt);
-            byte[] original = metrics.measure(SongGenerationMetrics.Stage.TTS, () -> googleTtsService.synthesize(text));
-            var originalQuality = metrics.measure(SongGenerationMetrics.Stage.QUALITY,
-                    () -> inspect(original));
-            byte[] processed = metrics.measure(SongGenerationMetrics.Stage.PROCESSING,
-                    () -> processorClient.processVoice(original));
-            var processedQuality = metrics.measure(SongGenerationMetrics.Stage.QUALITY,
-                    () -> inspect(processed));
+            byte[] original = googleTtsService.synthesize(text);
+            var originalQuality = inspect(original);
+            byte[] processed = processorClient.processVoice(original);
+            var processedQuality = inspect(processed);
             if (originalQuality.audible() && processedQuality.audible()) {
-                return processed;
+                return new Result(processed, true);
             }
             if (processedQuality.score() > bestScore) {
                 best = processed;
                 bestScore = processedQuality.score();
             }
-            log.warn("노래 TTS 음량 부족. text={}, attempt={}/{}", text, attempt, MAX_ATTEMPTS);
         }
-        metrics.exhausted();
-        return best;
+        return new Result(best, false);
     }
 
     static boolean hasAudibleSpeech(byte[] audio) {
