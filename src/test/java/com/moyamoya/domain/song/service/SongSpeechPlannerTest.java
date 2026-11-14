@@ -14,16 +14,15 @@ class SongSpeechPlannerTest {
 
     @ParameterizedTest
     @CsvSource(value = {
-            "말|말,말|12.0,12.99",
-            "적금|적,금,적,금|12.0,12.5,12.99,13.49",
-            "소방차|소,방,차|12.0,12.5,12.99",
-            "국회의원|국,회,의,원|12.0,12.5,12.99,13.49",
-            "예방접종표|예,방,접,종,표|12.0,12.25,12.5,12.74,12.99",
-            "어린이도서관|어린이도서관|12.0"
+            "말|말,말|0.0,0.99",
+            "적금|적,금,적,금|0.0,0.5,0.99,1.49",
+            "소방차|소,방,차|0.0,0.5,0.99",
+            "국회의원|국,회,의,원|0.0,0.5,0.99,1.49",
+            "예방접종표|예,방,접,종,표|0.0,0.25,0.5,0.74,0.99",
+            "어린이도서관|어린이도서관|0.0"
     }, delimiter = '|')
     void appliesLengthSpecificSyllableRules(String word, String spoken, String starts) {
-        var result = planner.plan(List.of(word, "가나다라마바", "가나다라마바", "가나다라마바", "가나다라마바"));
-        var first = result.stream().filter(placement -> placement.startSec() < 16).toList();
+        var first = planner.planWord(word);
 
         assertThat(first).extracting(SongSpeechPlacement::text).containsExactly(spoken.split(","));
         assertThat(first).extracting(SongSpeechPlacement::startSec)
