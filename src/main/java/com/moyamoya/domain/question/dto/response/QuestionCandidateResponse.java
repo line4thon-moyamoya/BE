@@ -82,7 +82,7 @@ public record QuestionCandidateResponse(
 
     public static String buildDialogue(List<CandidateResponse> candidates) {
         if (candidates.size() == 1) {
-            return candidates.getFirst().word() + " 말하는 거야?";
+            return candidates.getFirst().word() + "을 말하는 거 같아!";
         }
 
         String words = String.join(
