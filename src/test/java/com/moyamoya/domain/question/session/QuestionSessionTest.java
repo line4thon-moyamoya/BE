@@ -58,6 +58,42 @@ class QuestionSessionTest {
                 .isEqualTo("무언가를 생각하고 결정하는 힘이야.");
     }
 
+    @Test
+    void shouldHitCachedOtherMeaningsWithPublicCandidateId() {
+        QuestionSession session = createSession();
+
+        WordCandidate candidate = new WordCandidate(
+                "external-1",
+                null,
+                "머리",
+                WordSourceType.EXTERNAL,
+                0.8,
+                0.8,
+                0.8,
+                "사람이나 동물의 목 위 부분",
+                null,
+                null,
+                null,
+                null
+        );
+
+        session.setFirstCandidates(List.of(candidate));
+
+        session.cacheOtherMeanings(
+                "c_001",
+                List.of(new OtherMeaning(
+                        "m_001",
+                        "생각하고 판단하는 능력",
+                        "무언가를 생각하고 결정하는 힘이야."
+                ))
+        );
+
+        assertThat(session.hasCachedOtherMeanings("c_001")).isTrue();
+        assertThat(session.getCachedOtherMeanings("c_001"))
+                .extracting(OtherMeaning::meaningId)
+                .containsExactly("m_001");
+    }
+
     // 1차 후보가 없으면 FIRST_NO_CANDIDATES
     @Test
     void setFirstCandidatesWithEmptyListSetsFirstNoCandidates() {

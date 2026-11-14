@@ -297,16 +297,18 @@ public class QuestionSession {
     public synchronized boolean hasCachedOtherMeanings(
             String candidateId
     ) {
+        String resolvedCandidateId = resolveCachedCandidateId(candidateId);
         return otherMeaningsCache.containsKey(
-                meaningCacheKey(candidateId)
+                meaningCacheKey(resolvedCandidateId)
         );
     }
 
     public synchronized List<OtherMeaning> getCachedOtherMeanings(
             String candidateId
     ) {
+        String resolvedCandidateId = resolveCachedCandidateId(candidateId);
         return otherMeaningsCache.getOrDefault(
-                meaningCacheKey(candidateId),
+                meaningCacheKey(resolvedCandidateId),
                 List.of()
         );
     }
@@ -345,6 +347,12 @@ public class QuestionSession {
                 .stream()
                 .filter(meaning -> meaning.meaningId().equals(meaningId))
                 .findFirst();
+    }
+
+    private String resolveCachedCandidateId(String candidateId) {
+        return findCurrentCandidate(candidateId)
+                .map(WordCandidate::candidateId)
+                .orElse(candidateId);
     }
 
     private void requireCandidateReady() {

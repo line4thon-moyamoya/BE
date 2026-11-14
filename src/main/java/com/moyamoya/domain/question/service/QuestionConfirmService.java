@@ -53,6 +53,13 @@ public class QuestionConfirmService {
             );
         }
 
+        // 공백 meaningId는 부가 처리가 시작되기 전에 즉시 거부
+        if (meaningId != null && !StringUtils.hasText(meaningId)) {
+            throw new CustomException(
+                    QuestionErrorCode.INVALID_QUESTION_REQUEST
+            );
+        }
+
         UUID uuid = parseSessionId(sessionId);
 
         QuestionSession session = sessionStore.find(uuid)
@@ -124,12 +131,6 @@ public class QuestionConfirmService {
                             easyDescription
                     );
                 });
-
-                if (meaningId != null && !StringUtils.hasText(meaningId)) {
-                    throw new CustomException(
-                            QuestionErrorCode.INVALID_QUESTION_REQUEST
-                    );
-                }
 
                 // 기존 설명은 유지하고 누락된 연령 설명만 생성, 저장
                 fillMissingAgeDescriptions(

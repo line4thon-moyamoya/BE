@@ -173,22 +173,51 @@ public class ExternalDictionaryService {
 
             List<DictionaryEntry> results = new ArrayList<>();
             Set<String> seen = new LinkedHashSet<>();
+            int detailTargets = 0;
+            int detailSuccess = 0;
+            int detailFailure = 0;
 
             // 2. 검색된 항목별 상세 조회
             if (items.isArray()) {
                 for (JsonNode item : items) {
+                    if (!shouldLookupDetail(item, normalized)) {
+                        continue;
+                    }
+
+                    detailTargets++;
                     try {
                         collectDetailMeanings(item, normalized, results, seen);
+                        detailSuccess++;
                     } catch (Exception e) {
                         // 개별 항목 실패는 다른 항목 처리 계속
+                        detailFailure++;
                     }
                 }
             } else if (items.isObject()) {
+                if (shouldLookupDetail(items, normalized)) {
+                    detailTargets++;
+                }
+
                 try {
                     collectDetailMeanings(items, normalized, results, seen);
+                    if (detailTargets > 0) {
+                        detailSuccess++;
+                    }
                 } catch (Exception e) {
                     // 단일 항목 실패 시 빈 결과로 처리됨
+                    if (detailTargets > 0) {
+                        detailFailure++;
+                    }
                 }
+            }
+
+            // 조회 대상이 있었는데 상세 조회가 모두 실패하면 장애로 처리
+            if (detailTargets > 0
+                    && detailSuccess == 0
+                    && detailFailure > 0) {
+                throw new IllegalStateException(
+                        "사전 상세 조회가 모두 실패했습니다."
+                );
             }
 
             return results;
@@ -199,6 +228,14 @@ public class ExternalDictionaryService {
     }
 
     // target_code를 이용한 상세 뜻 수집
+    private boolean shouldLookupDetail(JsonNode item, String expectedWord) {
+        String word = clean(item.path("word").asText());
+        String targetCode = item.path("target_code").asText();
+
+        return expectedWord.equals(word)
+                && StringUtils.hasText(targetCode);
+    }
+
     private void collectDetailMeanings(
             JsonNode item,
             String expectedWord,
@@ -219,7 +256,7 @@ public class ExternalDictionaryService {
                 .queryParam("key", apiKey)
                 .queryParam("type_search", "view")
                 .queryParam("req_type", "json")
-                .queryParam("method", "TARGET_CODE")
+                .queryParam("method", "target_code")
                 .queryParam("q", targetCode)
                 .build()
                 .toUri();
