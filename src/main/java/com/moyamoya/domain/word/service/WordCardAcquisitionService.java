@@ -3,6 +3,7 @@ package com.moyamoya.domain.word.service;
 import com.moyamoya.domain.child.entity.Child;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.song.model.SongRegistrationResult;
+import com.moyamoya.domain.song.model.SongWordAudioPreparationRequested;
 import com.moyamoya.domain.song.service.SongRegistrationService;
 import com.moyamoya.domain.word.entity.LearnedWord;
 import com.moyamoya.domain.word.entity.Word;
@@ -14,6 +15,7 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.security.exception.SecurityErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -23,6 +25,7 @@ public class WordCardAcquisitionService {
     private final WordRepository wordRepository;
     private final LearnedWordRepository learnedWordRepository;
     private final SongRegistrationService songRegistrationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public CardAcquisitionResult acquireCard(Long userId, Long childId, Long wordId, boolean isCorrect) {
@@ -52,6 +55,9 @@ public class WordCardAcquisitionService {
         SongRegistrationResult registration = isNewAcquisition
                 ? songRegistrationService.register(child)
                 : new SongRegistrationResult(learnedWordRepository.countUnusedForSongByChildId(childId), null);
+        if (isNewAcquisition) {
+            eventPublisher.publishEvent(new SongWordAudioPreparationRequested(word.getWord()));
+        }
         return new CardAcquisitionResult(card.getId(), isNewAcquisition, card.isStickerEarned(),
                 registration.couponCount(), registration.songId());
     }

@@ -64,6 +64,41 @@ class SongAudioStorageServiceTest {
     }
 
     @Test
+    void wordAudioKeySeparatesVersionEnvironmentWordAndText() {
+        byte[] wav = {1, 2};
+        when(audio.uploadWav(anyString(), same(wav))).thenAnswer(invocation -> "local/" + invocation.getArgument(0));
+        var service = storage();
+        String key = service.uploadWord(7L, "학교", wav);
+        assertThat(service.isCurrentWordKey(7L, "학교", key)).isTrue();
+        assertThat(service.isCurrentWordKey(8L, "학교", key)).isFalse();
+        assertThat(service.isCurrentWordKey(7L, "변경", key)).isFalse();
+        assertThat(service.isCurrentWordKey(7L, "학교", key.replace("local/", "prod/"))).isFalse();
+        assertThat(service.isCurrentWordKey(7L, "학교", key.replace("beats-v1", "beats-v0"))).isFalse();
+        verify(audio, never()).getPresignedUrl(anyString());
+    }
+
+    @Test
+    void missingWordAudioReturnsCacheMissButOutageIsPreserved() {
+        when(s3.getObject(any(GetObjectRequest.class)))
+                .thenThrow(NoSuchKeyException.builder().statusCode(404).message("missing").build());
+        assertThat(storage().downloadWord("local/key")).isNull();
+        var failure = software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(503).build();
+        when(s3.getObject(any(GetObjectRequest.class))).thenThrow(failure);
+        assertThatIllegalStateException().isThrownBy(() -> storage().downloadWord("local/key"))
+                .withCause(failure);
+    }
+
+    @Test
+    void wordDownloadReadsExactKeyWithSizeLimitAndClosesStream() throws Exception {
+        var stream = spy(new ResponseInputStream<>(GetObjectResponse.builder().contentLength(3L).build(),
+                new ByteArrayInputStream(new byte[]{1, 2, 3})));
+        when(s3.getObject(any(GetObjectRequest.class))).thenReturn(stream);
+        assertThat(storage().downloadWord("local/word.wav")).containsExactly(1, 2, 3);
+        verify(s3).getObject(GetObjectRequest.builder().bucket("test-bucket").key("local/word.wav").build());
+        verify(stream).close();
+    }
+
+    @Test
     void uploadsUniqueRelativeKeyAndPresignsExactReturnedKey() {
         byte[] wav = {1, 2};
         String savedKey = "local/songs/generated/test.wav";

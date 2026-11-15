@@ -31,13 +31,14 @@ class WordCardAcquisitionServiceTest {
     @Mock private WordRepository words;
     @Mock private LearnedWordRepository cards;
     @Mock private SongRegistrationService songs;
+    @Mock private org.springframework.context.ApplicationEventPublisher events;
     private WordCardAcquisitionService service;
     private Child child;
     private Word word;
 
     @BeforeEach
     void setUp() {
-        service = new WordCardAcquisitionService(children, words, cards, songs);
+        service = new WordCardAcquisitionService(children, words, cards, songs, events);
         lenient().when(songs.register(any())).thenReturn(new SongRegistrationResult(1, null));
     }
 
@@ -46,6 +47,7 @@ class WordCardAcquisitionServiceTest {
         when(owner.getId()).thenReturn(7L);
         child = Child.create(owner, "지우", AgeGroup.AGE_5);
         word = mock(Word.class);
+        lenient().when(word.getWord()).thenReturn("word");
         when(children.findByIdForUpdate(2L)).thenReturn(Optional.of(child));
         when(words.findById(1L)).thenReturn(Optional.of(word));
     }
@@ -72,6 +74,7 @@ class WordCardAcquisitionServiceTest {
         assertThat(result.stickerEarned()).isEqualTo(correct);
         assertThat(result.couponCount()).isEqualTo(1);
         assertThat(result.songId()).isNull();
+        verify(events).publishEvent(new com.moyamoya.domain.song.model.SongWordAudioPreparationRequested("word"));
         var order = inOrder(children, words, cards, songs);
         order.verify(children).findByIdForUpdate(2L);
         order.verify(words).findById(1L);
@@ -100,7 +103,7 @@ class WordCardAcquisitionServiceTest {
         assertThat(card.isStickerEarned()).isEqualTo(earned || correct);
         assertThat(card.isNew()).isEqualTo(isNew);
         verify(cards, never()).save(any());
-        verifyNoInteractions(songs);
+        verifyNoInteractions(songs, events);
     }
 
     @Test
@@ -115,7 +118,7 @@ class WordCardAcquisitionServiceTest {
         assertThat(card.isStickerEarned()).isTrue();
         assertThat(card.isNew()).isFalse();
         verify(cards, never()).save(any());
-        verifyNoInteractions(songs);
+        verifyNoInteractions(songs, events);
     }
 
     @Test
@@ -142,7 +145,7 @@ class WordCardAcquisitionServiceTest {
 
         assertThat(result.couponCount()).isEqualTo(4);
         assertThat(result.songId()).isNull();
-        verifyNoInteractions(songs);
+        verifyNoInteractions(songs, events);
     }
 
     @Test
@@ -162,6 +165,7 @@ class WordCardAcquisitionServiceTest {
         assertThat(retry.couponCount()).isZero();
         verify(songs, times(1)).register(child);
         verify(cards, times(1)).save(any());
+        verify(events).publishEvent(new com.moyamoya.domain.song.model.SongWordAudioPreparationRequested("word"));
     }
 
     private void error(String code, Long userId, Long childId, Long wordId) {
@@ -175,7 +179,7 @@ class WordCardAcquisitionServiceTest {
             "7|2|NULL|WORD400", "7|2|0|WORD400"}, delimiter = '|', nullValues = "NULL")
     void rejectsInvalidIdsBeforeDatabaseAccess(Long user, Long childId, Long wordId, String code) {
         error(code, user, childId, wordId);
-        verifyNoInteractions(children, words, cards);
+        verifyNoInteractions(children, words, cards, events);
     }
 
     @Test
