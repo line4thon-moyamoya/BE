@@ -17,6 +17,7 @@ import com.moyamoya.domain.question.dto.response.SecondCandidateResponse;
 import com.moyamoya.domain.question.dto.response.WordRequestSaveResponse;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
 import com.moyamoya.domain.question.service.QuestionConfirmService;
+import com.moyamoya.domain.question.service.QuestionOtherMeaningService;
 import com.moyamoya.domain.question.service.QuestionService;
 import com.moyamoya.domain.question.service.WordRequestSaveService;
 import com.moyamoya.global.exception.CustomException;
@@ -42,6 +43,8 @@ class QuestionControllerTest {
     private QuestionConfirmService questionConfirmService;
     @Mock
     private WordRequestSaveService wordRequestSaveService;
+    @Mock
+    private QuestionOtherMeaningService questionOtherMeaningService;
 
     private MockMvc mockMvc;
 
@@ -51,7 +54,8 @@ class QuestionControllerTest {
                 .standaloneSetup(new QuestionController(
                         questionService,
                         questionConfirmService,
-                        wordRequestSaveService
+                        wordRequestSaveService,
+                        questionOtherMeaningService
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
@@ -75,7 +79,8 @@ class QuestionControllerTest {
                         null,
                         "https://example.com/word-audio",
                         null,
-                        null
+                        null,
+                        false
                 )),
                 new QuestionCandidateResponse.Dialogue("적금 말하는 거야?", null, "base64-audio", "audio/wav"),
                 "CANDIDATE_SELECTION"
@@ -119,7 +124,8 @@ class QuestionControllerTest {
                                 null,
                                 null,
                                 "base64-word",
-                                "audio/wav"
+                                "audio/wav",
+                                false
                         )),
                         new SecondCandidateResponse.Dialogue(
                                 "예금 말하는 거야?",
@@ -149,7 +155,7 @@ class QuestionControllerTest {
 
     @Test
     void confirmReturnsExpectedResponse() throws Exception {
-        when(questionConfirmService.confirmWord(7L, "session-1", "c_001"))
+        when(questionConfirmService.confirmWord(7L, "session-1", "c_001", null))
                 .thenReturn(new ConfirmWordResponse(
                         "CONFIRMED",
                         157L,
@@ -175,7 +181,7 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.data.wordId").value(157))
                 .andExpect(jsonPath("$.data.word").value("적금"));
 
-        verify(questionConfirmService).confirmWord(7L, "session-1", "c_001");
+        verify(questionConfirmService).confirmWord(7L, "session-1", "c_001", null);
     }
 
     @Test
@@ -220,7 +226,7 @@ class QuestionControllerTest {
 
     @Test
     void confirmReturnsQuestion400WhenCandidateIsInvalid() throws Exception {
-        when(questionConfirmService.confirmWord(7L, "session-1", "c_999"))
+        when(questionConfirmService.confirmWord(7L, "session-1", "c_999", null))
                 .thenThrow(new CustomException(QuestionErrorCode.INVALID_CANDIDATE));
 
         mockMvc.perform(post("/api/v1/questions/session-1/confirm")
@@ -239,7 +245,7 @@ class QuestionControllerTest {
 
     @Test
     void confirmReturnsQuestion404WhenSessionIsNotFound() throws Exception {
-        when(questionConfirmService.confirmWord(7L, "missing-session", "c_001"))
+        when(questionConfirmService.confirmWord(7L, "missing-session", "c_001", null))
                 .thenThrow(new CustomException(QuestionErrorCode.SESSION_NOT_FOUND));
 
         mockMvc.perform(post("/api/v1/questions/missing-session/confirm")
@@ -258,7 +264,7 @@ class QuestionControllerTest {
 
     @Test
     void confirmReturnsQuestion403WhenForbidden() throws Exception {
-        when(questionConfirmService.confirmWord(7L, "session-1", "c_001"))
+        when(questionConfirmService.confirmWord(7L, "session-1", "c_001", null))
                 .thenThrow(new CustomException(QuestionErrorCode.ACCESS_FORBIDDEN));
 
         mockMvc.perform(post("/api/v1/questions/session-1/confirm")
@@ -285,5 +291,94 @@ class QuestionControllerTest {
                 .andExpect(jsonPath("$.code").value("GLOBAL400"));
 
         verifyNoInteractions(questionConfirmService);
+    }
+
+    @Test
+    void confirmWithMeaningIdReturnsExpectedResponse() throws Exception {
+        when(questionConfirmService.confirmWord(
+                7L, "session-1", "c_001", "m_001"
+        )).thenReturn(new ConfirmWordResponse(
+                "CONFIRMED",
+                158L,
+                "머리",
+                "무언가를 생각하고 어떻게 할지 결정하는 능력이야.",
+                null,
+                "https://example.com/word-audio",
+                "WORD_LEARNING"
+        ));
+
+        mockMvc.perform(post("/api/v1/questions/session-1/confirm")
+                        .principal(() -> "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "candidateId": "c_001",
+                              "meaningId": "m_001"
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.message").value("단어를 확정했습니다."))
+                .andExpect(jsonPath("$.data.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.data.wordId").value(158))
+                .andExpect(jsonPath("$.data.word").value("머리"))
+                .andExpect(jsonPath("$.data.description")
+                        .value("무언가를 생각하고 어떻게 할지 결정하는 능력이야."));
+
+        verify(questionConfirmService).confirmWord(
+                7L, "session-1", "c_001", "m_001"
+        );
+    }
+
+    @Test
+    void confirmReturns400WhenMeaningIdIsInvalid() throws Exception {
+        when(questionConfirmService.confirmWord(
+                7L, "session-1", "c_001", "m_999"
+        )).thenThrow(new CustomException(
+                QuestionErrorCode.INVALID_CANDIDATE
+        ));
+
+        mockMvc.perform(post("/api/v1/questions/session-1/confirm")
+                        .principal(() -> "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "candidateId": "c_001",
+                              "meaningId": "m_999"
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code")
+                        .value("QUESTION400_INVALID_CANDIDATE"));
+
+        verify(questionConfirmService).confirmWord(
+                7L, "session-1", "c_001", "m_999"
+        );
+    }
+
+    @Test
+    void confirmReturnsErrorWhenExistingWordHasMeaningId() throws Exception {
+        when(questionConfirmService.confirmWord(
+                7L, "session-1", "c_001", "m_001"
+        )).thenThrow(new CustomException(
+                QuestionErrorCode.OTHER_MEANINGS_NOT_ALLOWED
+        ));
+
+        mockMvc.perform(post("/api/v1/questions/session-1/confirm")
+                        .principal(() -> "7")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "candidateId": "c_001",
+                              "meaningId": "m_001"
+                            }
+                            """))
+                .andExpect(jsonPath("$.success").value(false));
+
+        verify(questionConfirmService).confirmWord(
+                7L, "session-1", "c_001", "m_001"
+        );
     }
 }

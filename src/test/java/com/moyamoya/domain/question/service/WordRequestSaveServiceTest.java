@@ -1,6 +1,7 @@
 package com.moyamoya.domain.question.service;
 
 import com.moyamoya.domain.child.entity.Child;
+import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.child.repository.ChildRepository;
 import com.moyamoya.domain.question.dto.response.WordRequestSaveResponse;
 import com.moyamoya.domain.question.exception.QuestionErrorCode;
@@ -8,6 +9,7 @@ import com.moyamoya.domain.question.session.QuestionSession;
 import com.moyamoya.domain.question.session.QuestionSessionStore;
 import com.moyamoya.domain.user.entity.User;
 import com.moyamoya.domain.word.entity.HeardFrom;
+import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.entity.WordRequest;
 import com.moyamoya.domain.word.entity.WordRequestStatus;
 import com.moyamoya.domain.word.repository.WordRequestRepository;
@@ -89,6 +91,43 @@ class WordRequestSaveServiceTest {
     }
 
     @Test
+    void saveAllowedWhenFirstCandidatesReady() {
+        Long userId = 7L;
+        QuestionSession session = firstReadySession("audio/wav");
+        UUID sessionId = session.getSessionId();
+        Child child = childOwnedBy(userId);
+        byte[] bytes = wavBytes();
+
+        when(sessionStore.find(sessionId)).thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
+        when(childRepository.findById(2L)).thenReturn(Optional.of(child));
+        when(audioTempService.read(session.getOriginalAudioTempPath()))
+                .thenReturn(bytes);
+
+        String expectedKey = "questions/original/2/" + sessionId + ".wav";
+        when(s3Service.uploadAudio(
+                eq(expectedKey),
+                eq(bytes),
+                eq("audio/wav")
+        )).thenReturn(expectedKey);
+
+        WordRequest saved = mock(WordRequest.class);
+        when(saved.getId()).thenReturn(11L);
+        when(saved.getStatus()).thenReturn(WordRequestStatus.PENDING);
+        when(wordRequestRepository.save(any())).thenReturn(saved);
+
+        WordRequestSaveResponse response = wordRequestSaveService.save(
+                userId,
+                sessionId.toString()
+        );
+
+        assertThat(response.wordRequestId()).isEqualTo(11L);
+        assertThat(session.getStatus()).isEqualTo(
+                com.moyamoya.domain.question.session.QuestionSessionStatus.UNRESOLVED
+        );
+    }
+
+    @Test
     void saveThrowsInvalidAudioFileWhenContentTypeAndBytesMismatch() {
         Long userId = 7L;
         QuestionSession session = readySession("audio/wav");
@@ -158,6 +197,30 @@ class WordRequestSaveServiceTest {
         session.setExtractionResult("적금", List.of("적금"));
         session.setFirstCandidates(List.of());
         session.setSecondCandidates(HeardFrom.PARENTS, List.of());
+        return session;
+    }
+
+    private QuestionSession firstReadySession(String contentType) {
+        QuestionSession session = QuestionSession.create(2L, "적금이 뭐야", null);
+        session.attachOriginalAudio(
+                Path.of("C:\\temp\\audio.tmp"),
+                contentType
+        );
+        session.setExtractionResult("적금", List.of("적금"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "external:적금",
+                null,
+                "적금",
+                WordSourceType.EXTERNAL,
+                0.8,
+                0.8,
+                0.8,
+                "정의",
+                null,
+                null,
+                null,
+                null
+        )));
         return session;
     }
 
