@@ -151,6 +151,19 @@ class SongTtsServiceTest {
         assertThat(SongTtsService.hasAudibleSpeech(wav(0.2, 0.3, 0.04, false))).isTrue();
     }
 
+    @ParameterizedTest
+    @ValueSource(doubles = {0, 0.001, 0.002, 0.003, 0.004, 0.018, 0.019, 0.0195})
+    void acceptsMinimumDurationLowVolumeSignalWhenStartIsNotAligned(double start) throws Exception {
+        byte[] voice = wav(0.016, 0.3, 0.04, false, start);
+        assertThat(SongTtsService.hasAudibleSpeech(voice)).isTrue();
+        when(google.synthesize("우")).thenReturn(voice);
+        when(processor.processVoice(voice)).thenReturn(voice);
+        var result = service.synthesize("우");
+        assertThat(result.qualityPassed()).isTrue();
+        verify(google).synthesize("우");
+        verify(processor).processVoice(voice);
+    }
+
     private byte[] wav(double amplitude, double duration, double activeDuration, boolean noise) throws Exception {
         return wav(amplitude, duration, activeDuration, noise, 0);
     }
