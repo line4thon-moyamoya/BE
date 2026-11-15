@@ -24,11 +24,19 @@ public class SongSyllableExecutor {
         executor.shutdown();
         try {
             if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
+                cancelQueuedTasks();
             }
         } catch (InterruptedException exception) {
-            executor.shutdownNow();
+            cancelQueuedTasks();
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private void cancelQueuedTasks() {
+        for (Runnable task : executor.shutdownNow()) {
+            if (task instanceof Future<?> future) {
+                future.cancel(true);
+            }
         }
     }
 }
