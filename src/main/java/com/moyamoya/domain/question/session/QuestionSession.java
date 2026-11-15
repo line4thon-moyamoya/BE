@@ -243,10 +243,12 @@ public class QuestionSession {
         touch();
     }
 
-    // 2차 후보가 없거나 모두 거절된 경우 미해결 처리
+    // 1차/2차 후보 단계에서 중도 포기 시 미해결 처리
     public synchronized void markUnresolved() {
 
-        if (status != QuestionSessionStatus.SECOND_CANDIDATES_READY
+        if (status != QuestionSessionStatus.FIRST_CANDIDATES_READY
+                && status != QuestionSessionStatus.FIRST_NO_CANDIDATES
+                && status != QuestionSessionStatus.SECOND_CANDIDATES_READY
                 && status != QuestionSessionStatus.SECOND_NO_CANDIDATES) {
             throw new IllegalStateException(
                     "미해결 처리할 수 없는 상태입니다: " + status

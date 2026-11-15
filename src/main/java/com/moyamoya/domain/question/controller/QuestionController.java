@@ -734,7 +734,8 @@ public class QuestionController {
     @Operation(
             summary = "물어볼 단어 저장",
             description = """
-                    2차 단어 후보를 모두 거절한 경우 호출합니다.
+                    1차 또는 2차 후보 단계에서
+                    단어 확정을 중단하고 저장할 때 호출합니다.
                     원본 음성을 S3에 업로드하고,
                     조사 제거 여부까지 판단한 표현을
                     물어볼 단어로 저장합니다.

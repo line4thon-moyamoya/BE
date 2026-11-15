@@ -188,6 +188,21 @@ class QuestionSessionTest {
                 .isEqualTo(QuestionSessionStatus.UNRESOLVED);
     }
 
+    // 1차 후보 단계에서도 중도 포기로 미해결 처리 가능
+    @Test
+    void markUnresolvedAllowedWhenFirstCandidatesReady() {
+        QuestionSession session = createSession();
+
+        session.setFirstCandidates(
+                List.of(candidate("1", "사과"))
+        );
+
+        session.markUnresolved();
+
+        assertThat(session.getStatus())
+                .isEqualTo(QuestionSessionStatus.UNRESOLVED);
+    }
+
     // 2차 후보를 모두 거절한 경우에도 미해결 처리 가능
     @Test
     void markUnresolvedAllowedAfterSecondCandidates() {
