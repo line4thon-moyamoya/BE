@@ -85,6 +85,18 @@ public enum QuestionErrorCode implements BaseErrorCode {
             "QUESTION500_AUDIO_TEMP_SAVE_FAILED",
             "원본 음성 파일을 처리하는 중 문제가 발생했습니다.",
             HttpStatus.INTERNAL_SERVER_ERROR
+    ),
+
+    OTHER_MEANINGS_NOT_ALLOWED(
+            "QUESTION400_OTHER_MEANINGS_NOT_ALLOWED",
+            "다른 의미를 물어볼 수 없는 단어입니다.",
+            HttpStatus.BAD_REQUEST
+    ),
+
+    DICTIONARY_LOOKUP_FAILED(
+            "QUESTION502_DICTIONARY_LOOKUP_FAILED",
+            "사전 조회 서비스에 문제가 발생했습니다.",
+            HttpStatus.BAD_GATEWAY
     );
 
     private final String code;

@@ -2,12 +2,10 @@ package com.moyamoya.domain.question.controller;
 
 import com.moyamoya.domain.question.dto.request.ConfirmWordRequest;
 import com.moyamoya.domain.question.dto.request.SecondCandidateRequest;
-import com.moyamoya.domain.question.dto.response.ConfirmWordResponse;
-import com.moyamoya.domain.question.dto.response.QuestionCandidateResponse;
-import com.moyamoya.domain.question.dto.response.SecondCandidateResponse;
+import com.moyamoya.domain.question.dto.response.*;
 import com.moyamoya.domain.question.service.QuestionConfirmService;
+import com.moyamoya.domain.question.service.QuestionOtherMeaningService;
 import com.moyamoya.domain.question.service.QuestionService;
-import com.moyamoya.domain.question.dto.response.WordRequestSaveResponse;
 import com.moyamoya.domain.question.service.WordRequestSaveService;
 import com.moyamoya.global.common.BaseResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,13 +21,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import java.security.Principal;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Question", description = "아이 질문 및 단어 후보 탐색 API")
@@ -257,7 +250,8 @@ public class QuestionController {
             """;
     private static final String CONFIRM_REQUEST_EXAMPLE = """
             {
-              "candidateId": "c_001"
+              "candidateId": "c_001",
+              "meaningId": "m_001"
             }
             """;
     private static final String CONFIRM_SUCCESS_EXAMPLE = """
@@ -316,6 +310,82 @@ public class QuestionController {
               "data": null
             }
             """;
+
+    private static final String OTHER_MEANINGS_SUCCESS_EXAMPLE = """
+        {
+          "success": true,
+          "code": 200,
+          "message": "다른 뜻을 조회했습니다.",
+          "data": {
+            "hasOtherMeanings": true,
+            "meaningCount": 1,
+            "meanings": [
+              {
+                "meaningId": "m_001",
+                "description": "생각하거나 판단하는 능력을 뜻하기도 해."
+              }
+            ]
+          }
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_EMPTY_EXAMPLE = """
+        {
+          "success": true,
+          "code": 200,
+          "message": "다른 뜻을 조회했습니다.",
+          "data": {
+            "hasOtherMeanings": false,
+            "meaningCount": 0,
+            "meanings": []
+          }
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_INVALID_REQUEST_EXAMPLE = """
+        {
+          "success": false,
+          "code": "QUESTION400",
+          "message": "질문 요청을 올바르게 입력해 주세요.",
+          "data": null
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_UNAUTHORIZED_EXAMPLE = """
+        {
+          "success": false,
+          "code": "AUTH401",
+          "message": "인증이 필요합니다.",
+          "data": null
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_FORBIDDEN_EXAMPLE = """
+        {
+          "success": false,
+          "code": "QUESTION403",
+          "message": "해당 질문 정보에 접근할 권한이 없습니다.",
+          "data": null
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_NOT_FOUND_EXAMPLE = """
+        {
+          "success": false,
+          "code": "QUESTION404",
+          "message": "존재하지 않거나 만료된 질문입니다.",
+          "data": null
+        }
+        """;
+
+    private static final String OTHER_MEANINGS_CONFLICT_EXAMPLE = """
+        {
+          "success": false,
+          "code": "QUESTION409",
+          "message": "현재 질문 단계에서는 요청을 처리할 수 없습니다.",
+          "data": null
+        }
+        """;
     private static final String WORD_REQUEST_SAVE_SUCCESS_EXAMPLE = """
             {
               "success": true,
@@ -380,6 +450,7 @@ public class QuestionController {
     private final QuestionService questionService;
     private final QuestionConfirmService questionConfirmService;
     private final WordRequestSaveService wordRequestSaveService;
+    private final QuestionOtherMeaningService questionOtherMeaningService;
 
     @Operation(
             summary = "음성 질문 분석 및 1차 후보 탐색",
@@ -651,7 +722,8 @@ public class QuestionController {
         ConfirmWordResponse response = questionConfirmService.confirmWord(
                 userId,
                 sessionId,
-                request.candidateId()
+                request.candidateId(),
+                request.meaningId()
         );
 
         return ResponseEntity.ok(
@@ -662,7 +734,8 @@ public class QuestionController {
     @Operation(
             summary = "물어볼 단어 저장",
             description = """
-                    2차 단어 후보를 모두 거절한 경우 호출합니다.
+                    1차 또는 2차 후보 단계에서
+                    단어 확정을 중단하고 저장할 때 호출합니다.
                     원본 음성을 S3에 업로드하고,
                     조사 제거 여부까지 판단한 표현을
                     물어볼 단어로 저장합니다.
@@ -748,6 +821,113 @@ public class QuestionController {
         return ResponseEntity.ok(
                 BaseResponse.success(
                         "물어볼 단어로 저장되었습니다.",
+                        response
+                )
+        );
+    }
+
+    @Operation(
+            summary = "단어 후보의 다른 뜻 조회",
+            description = """
+                1차 또는 2차 후보가 1개이고,
+                신규 외부 사전 단어인 경우 다른 뜻을 조회합니다.
+                다른 뜻이 없으면 빈 목록을 반환합니다.
+                """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "다른 뜻 조회 완료",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "다른 뜻 있음",
+                                            value = OTHER_MEANINGS_SUCCESS_EXAMPLE
+                                    ),
+                                    @ExampleObject(
+                                            name = "다른 뜻 없음",
+                                            value = OTHER_MEANINGS_EMPTY_EXAMPLE
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "잘못된 요청 또는 후보 ID",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(
+                                    value = OTHER_MEANINGS_INVALID_REQUEST_EXAMPLE
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "로그인이 필요합니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(
+                                    value = OTHER_MEANINGS_UNAUTHORIZED_EXAMPLE
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "해당 질문 세션에 접근할 권한이 없습니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(
+                                    value = OTHER_MEANINGS_FORBIDDEN_EXAMPLE
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "질문 세션 또는 후보를 찾을 수 없습니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(
+                                    value = OTHER_MEANINGS_NOT_FOUND_EXAMPLE
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "현재 단계에서 다른 뜻 조회 불가",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = BaseResponse.class),
+                            examples = @ExampleObject(
+                                    value = OTHER_MEANINGS_CONFLICT_EXAMPLE
+                            )
+                    )
+            )
+    })
+    @GetMapping("/{sessionId}/candidates/{candidateId}/meanings")
+    public ResponseEntity<BaseResponse<OtherMeaningsResponse>> getOtherMeanings(
+            Principal principal,
+            @PathVariable String sessionId,
+            @PathVariable String candidateId
+    ) {
+        Long userId = Long.valueOf(principal.getName());
+
+        OtherMeaningsResponse response =
+                questionOtherMeaningService.getOtherMeanings(
+                        userId,
+                        sessionId,
+                        candidateId
+                );
+
+        return ResponseEntity.ok(
+                BaseResponse.success(
+                        "다른 뜻을 조회했습니다.",
                         response
                 )
         );

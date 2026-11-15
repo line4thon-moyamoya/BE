@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class QuestionConfirmServiceTest {
@@ -102,7 +103,8 @@ class QuestionConfirmServiceTest {
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_999"
+                "c_999",
+                null
         ))
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
@@ -142,11 +144,48 @@ class QuestionConfirmServiceTest {
         assertThatThrownBy(() -> questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         ))
                 .isInstanceOf(CustomException.class)
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
                 .isEqualTo(QuestionErrorCode.TTS_GENERATION_FAILED);
+    }
+
+    @Test
+    void confirmWordRejectsBlankMeaningIdBeforeAnyUpload() {
+        QuestionSession session = QuestionSession.create(1L, "적금이 뭐야", null);
+        session.setExtractionResult("적금", List.of("적금"));
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "EXTERNAL:적금",
+                null,
+                "적금",
+                WordSourceType.EXTERNAL,
+                0.9,
+                0.0,
+                0.9,
+                "정의",
+                null,
+                null,
+                "base64-audio",
+                "audio/wav"
+        )));
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        when(sessionStore.isCurrent(session)).thenReturn(true);
+        stubChildOwnership(1L, 1L);
+
+        assertThatThrownBy(() -> questionConfirmService.confirmWord(
+                1L,
+                session.getSessionId().toString(),
+                "c_001",
+                " "
+        ))
+                .isInstanceOf(CustomException.class)
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.INVALID_QUESTION_REQUEST);
+
+        verifyNoInteractions(s3Service);
     }
 
     @Test
@@ -198,7 +237,8 @@ class QuestionConfirmServiceTest {
         questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         );
 
         verify(wordDescriptionService).generate(
@@ -253,7 +293,8 @@ class QuestionConfirmServiceTest {
         var response = questionConfirmService.confirmWord(
                 1L,
                 session.getSessionId().toString(),
-                "c_001"
+                "c_001",
+                null
         );
 
         assertThat(session.getStatus())
