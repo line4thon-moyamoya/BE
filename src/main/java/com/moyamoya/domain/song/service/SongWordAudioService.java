@@ -6,6 +6,8 @@ import com.moyamoya.domain.word.entity.Word;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ public class SongWordAudioService {
     private final SongTtsService tts;
     private final PythonSongMixerClient mixer;
     private final SongAudioStorageService storage;
+    private final SongSyllableExecutor syllableExecutor;
     private final Object[] locks = IntStream.range(0, 64).mapToObj(index -> new Object()).toArray();
 
     public void prepare(String text) {
@@ -53,6 +56,28 @@ public class SongWordAudioService {
     private byte[] create(String text, Word word, Map<String, SongTtsService.Result> syllables) {
         String previous = word == null ? null : word.getSongAudioUrl();
         var plan = planner.planWord(text);
+        var pending = new LinkedHashMap<String, Future<SongTtsService.Result>>();
+        try {
+            for (var speech : plan) {
+                String syllable = speech.text();
+                if (!syllables.containsKey(syllable) && !pending.containsKey(syllable)) {
+                    pending.put(syllable, syllableExecutor.submit(() -> tts.synthesize(syllable)));
+                }
+            }
+            for (var entry : pending.entrySet()) {
+                syllables.put(entry.getKey(), entry.getValue().get());
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("노래 음절 생성 대기가 중단됐습니다.", exception);
+        } catch (ExecutionException exception) {
+            if (exception.getCause() instanceof RuntimeException cause) {
+                throw cause;
+            }
+            throw new IllegalStateException("노래 음절 생성에 실패했습니다.", exception.getCause());
+        } finally {
+            pending.values().forEach(task -> task.cancel(true));
+        }
         var indexes = new LinkedHashMap<String, Integer>();
         var voices = new ArrayList<byte[]>();
         var placements = new ArrayList<SongAudioPlacement>();
@@ -62,7 +87,7 @@ public class SongWordAudioService {
             var speech = plan.get(index);
             Integer audioIndex = indexes.get(speech.text());
             if (audioIndex == null) {
-                var voice = syllables.computeIfAbsent(speech.text(), tts::synthesize);
+                var voice = syllables.get(speech.text());
                 if (voice.audio() == null || voice.audio().length == 0 || voice.audio().length > 10 * 1024 * 1024) {
                     throw new IllegalStateException("단어 TTS 음성 데이터가 올바르지 않습니다.");
                 }

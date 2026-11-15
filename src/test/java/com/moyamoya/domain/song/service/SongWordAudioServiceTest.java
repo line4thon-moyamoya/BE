@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -18,7 +19,9 @@ class SongWordAudioServiceTest {
     private final SongTtsService tts = mock(SongTtsService.class);
     private final PythonSongMixerClient mixer = mock(PythonSongMixerClient.class);
     private final SongAudioStorageService storage = mock(SongAudioStorageService.class);
-    private final SongWordAudioService service = new SongWordAudioService(words, new SongSpeechPlanner(), tts, mixer, storage);
+    private final SongSyllableExecutor syllableExecutor = new SongSyllableExecutor();
+    private final SongWordAudioService service = new SongWordAudioService(words, new SongSpeechPlanner(), tts, mixer, storage,
+            syllableExecutor);
     private final Word word = mock(Word.class);
     private final byte[] syllable = {1};
     private final byte[] clip = {2};
@@ -27,6 +30,11 @@ class SongWordAudioServiceTest {
     void setup() {
         when(word.getId()).thenReturn(7L);
         when(words.findByWord("학교")).thenReturn(Optional.of(word));
+    }
+
+    @AfterEach
+    void shutdown() {
+        syllableExecutor.shutdown();
     }
 
     @Test
@@ -220,6 +228,39 @@ class SongWordAudioServiceTest {
         service.getOrCreate("어린이보호구역", new LinkedHashMap<>());
         verify(tts).synthesize("어린이보호구역");
         verify(mixer).composeWord(List.of(syllable), List.of(new SongAudioPlacement(0, 0, null)));
+        verify(storage, never()).uploadWord(any(), anyString(), any());
+    }
+
+    @Test
+    void generatesTwoSyllablesConcurrentlyAndPreservesOrderWhenSecondFinishesFirst() throws Exception {
+        generatedAudio();
+        byte[] firstAudio = {3};
+        byte[] secondAudio = {4};
+        var firstEntered = new java.util.concurrent.CountDownLatch(1);
+        var secondFinished = new java.util.concurrent.CountDownLatch(1);
+        when(tts.synthesize("학")).thenAnswer(invocation -> {
+            firstEntered.countDown();
+            assertThat(secondFinished.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            return new SongTtsService.Result(firstAudio, true);
+        });
+        when(tts.synthesize("교")).thenAnswer(invocation -> {
+            assertThat(firstEntered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            secondFinished.countDown();
+            return new SongTtsService.Result(secondAudio, true);
+        });
+        service.getOrCreate("학교", new LinkedHashMap<>());
+        verify(mixer).composeWord(eq(List.of(firstAudio, secondAudio)), anyList());
+        verify(tts).synthesize("학");
+        verify(tts).synthesize("교");
+    }
+
+    @Test
+    void parallelSyllableFailurePreservesCauseAndDoesNotComposeOrSaveWord() {
+        generatedAudio();
+        var failure = new IllegalStateException("TTS unavailable");
+        when(tts.synthesize("학")).thenThrow(failure);
+        assertThatThrownBy(() -> service.getOrCreate("학교", new LinkedHashMap<>())).isSameAs(failure);
+        verifyNoInteractions(mixer);
         verify(storage, never()).uploadWord(any(), anyString(), any());
     }
 
