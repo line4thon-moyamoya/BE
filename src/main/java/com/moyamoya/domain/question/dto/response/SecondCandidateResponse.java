@@ -33,8 +33,12 @@ public record SecondCandidateResponse(
             String dialogueAudioBase64
     ) {
         List<CandidateResponse> responses = candidates.stream()
-                .map(CandidateResponse::from)
+                .map(candidate -> CandidateResponse.from(
+                        candidate,
+                        candidates.size()
+                ))
                 .toList();
+
         boolean found = !responses.isEmpty();
 
         return new SecondCandidateResponse(

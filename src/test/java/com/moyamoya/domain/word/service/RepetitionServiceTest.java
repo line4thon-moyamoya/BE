@@ -50,7 +50,8 @@ class RepetitionServiceTest {
     void setUp() {
         service = new RepetitionService(children, words, stt,
                 new RepetitionEvaluationService(new PronunciationSimilarity(), loader, words),
-                new WordCardAcquisitionService(children, words, cards, songs), new RepetitionDialogueService(tts));
+                new WordCardAcquisitionService(children, words, cards, songs,
+                        mock(org.springframework.context.ApplicationEventPublisher.class)), new RepetitionDialogueService(tts));
         lenient().when(songs.register(any())).thenReturn(new SongRegistrationResult(0, 12L));
     }
 

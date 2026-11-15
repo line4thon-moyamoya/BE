@@ -74,6 +74,10 @@ public class WordRequestSaveService {
             }
 
             if (session.getStatus()
+                    != QuestionSessionStatus.FIRST_CANDIDATES_READY
+                    && session.getStatus()
+                    != QuestionSessionStatus.FIRST_NO_CANDIDATES
+                    && session.getStatus()
                     != QuestionSessionStatus.SECOND_CANDIDATES_READY
                     && session.getStatus()
                     != QuestionSessionStatus.SECOND_NO_CANDIDATES) {

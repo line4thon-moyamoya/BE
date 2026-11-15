@@ -79,7 +79,8 @@ class SongRegistrationTransactionTest {
             return invocation.getArgument(0);
         });
         var registration = proxy(new SongRegistrationService(cards, songs, songWords, mock(org.springframework.context.ApplicationEventPublisher.class)), transactions);
-        var acquisition = proxy(new WordCardAcquisitionService(children, words, cards, registration), transactions);
+        var acquisition = proxy(new WordCardAcquisitionService(children, words, cards, registration,
+                mock(org.springframework.context.ApplicationEventPublisher.class)), transactions);
 
         if (fail) {
             assertThatThrownBy(() -> acquisition.acquireCard(7L, 2L, 1L, false))

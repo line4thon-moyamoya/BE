@@ -1,5 +1,6 @@
 package com.moyamoya.domain.question.session;
 
+import com.moyamoya.domain.question.model.OtherMeaning;
 import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.word.entity.HeardFrom;
 import lombok.Getter;
@@ -51,6 +52,10 @@ public class QuestionSession {
     private QuestionSessionStatus status;
     private final LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+
+    private final Map<String, List<OtherMeaning>> otherMeaningsCache =
+            new HashMap<>();
 
     private QuestionSession(
             Long childId,
@@ -238,10 +243,12 @@ public class QuestionSession {
         touch();
     }
 
-    // 2차 후보가 없거나 모두 거절된 경우 미해결 처리
+    // 1차/2차 후보 단계에서 중도 포기 시 미해결 처리
     public synchronized void markUnresolved() {
 
-        if (status != QuestionSessionStatus.SECOND_CANDIDATES_READY
+        if (status != QuestionSessionStatus.FIRST_CANDIDATES_READY
+                && status != QuestionSessionStatus.FIRST_NO_CANDIDATES
+                && status != QuestionSessionStatus.SECOND_CANDIDATES_READY
                 && status != QuestionSessionStatus.SECOND_NO_CANDIDATES) {
             throw new IllegalStateException(
                     "미해결 처리할 수 없는 상태입니다: " + status
@@ -281,6 +288,73 @@ public class QuestionSession {
         this.originalAudioTempPath = null;
         this.originalAudioContentType = null;
         touch();
+    }
+
+    // 현재 단계의 다른 뜻 캐시 키
+    private String meaningCacheKey(String candidateId) {
+        return status.name() + ":" + candidateId;
+    }
+
+    // 조회 여부와 결과를 함께 보관 (빈 목록도 캐시)
+    public synchronized boolean hasCachedOtherMeanings(
+            String candidateId
+    ) {
+        String resolvedCandidateId = resolveCachedCandidateId(candidateId);
+        return otherMeaningsCache.containsKey(
+                meaningCacheKey(resolvedCandidateId)
+        );
+    }
+
+    public synchronized List<OtherMeaning> getCachedOtherMeanings(
+            String candidateId
+    ) {
+        String resolvedCandidateId = resolveCachedCandidateId(candidateId);
+        return otherMeaningsCache.getOrDefault(
+                meaningCacheKey(resolvedCandidateId),
+                List.of()
+        );
+    }
+
+    public synchronized void cacheOtherMeanings(
+            String candidateId,
+            List<OtherMeaning> meanings
+    ) {
+        requireCandidateReady();
+
+        WordCandidate candidate = findCurrentCandidate(candidateId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "현재 후보에 없는 candidateId입니다."
+                ));
+
+        otherMeaningsCache.put(
+                meaningCacheKey(candidate.candidateId()),
+                List.copyOf(meanings)
+        );
+        touch();
+    }
+
+    // 확정 시 선택한 뜻 확인
+    public synchronized Optional<OtherMeaning> findOtherMeaning(
+            String candidateId,
+            String meaningId
+    ) {
+        WordCandidate candidate = findCurrentCandidate(candidateId)
+                .orElse(null);
+
+        if (candidate == null) {
+            return Optional.empty();
+        }
+
+        return getCachedOtherMeanings(candidate.candidateId())
+                .stream()
+                .filter(meaning -> meaning.meaningId().equals(meaningId))
+                .findFirst();
+    }
+
+    private String resolveCachedCandidateId(String candidateId) {
+        return findCurrentCandidate(candidateId)
+                .map(WordCandidate::candidateId)
+                .orElse(candidateId);
     }
 
     private void requireCandidateReady() {

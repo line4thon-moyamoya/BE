@@ -44,7 +44,10 @@ public record QuestionCandidateResponse(
         };
 
         List<CandidateResponse> candidates = sourceCandidates.stream()
-                .map(CandidateResponse::from)
+                .map(candidate -> CandidateResponse.from(
+                        candidate,
+                        sourceCandidates.size()
+                ))
                 .toList();
 
         boolean found = session.getStatus() == QuestionSessionStatus.FIRST_CANDIDATES_READY
@@ -79,7 +82,8 @@ public record QuestionCandidateResponse(
 
     public static String buildDialogue(List<CandidateResponse> candidates) {
         if (candidates.size() == 1) {
-            return candidates.getFirst().word() + " 말하는 거야?";
+            String word = candidates.getFirst().word();
+            return word + objectParticle(word) + " 말하는 거 같아!";
         }
 
         String words = String.join(
@@ -92,5 +96,21 @@ public record QuestionCandidateResponse(
 
     private static boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static String objectParticle(String word) {
+        if (!hasText(word)) {
+            return "를";
+        }
+
+        String trimmed = word.trim();
+        char lastChar = trimmed.charAt(trimmed.length() - 1);
+
+        if (lastChar < '가' || lastChar > '힣') {
+            return "를";
+        }
+
+        int jongseong = (lastChar - '가') % 28;
+        return jongseong == 0 ? "를" : "을";
     }
 }

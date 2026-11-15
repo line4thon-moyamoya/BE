@@ -72,9 +72,28 @@ class SongMixerTest(unittest.TestCase):
         self.assertLess(duration, 0.48)
         self.assertEqual(max(abs(x) for x in samples[round(0.2 * 24000):round(0.24 * 24000)]), 0)
 
-    def test_silent_tts_fails_with_voice_index_instead_of_omitting_word(self):
-        with self.assertRaisesRegex(SongMixError, "인덱스 0"):
-            mix_song(wav_bytes(1), [wav_bytes(amplitude=0)], [(0, 0.5)])
+    @unittest.skipUnless(shutil.which("ffmpeg"), "FFmpeg is required for audio integration tests")
+    def test_silent_voice_keeps_backing_and_other_voice_timing(self):
+        result = mix_song(wav_bytes(2, amplitude=0.1),
+                          [wav_bytes(amplitude=0), wav_bytes(frequency=880)],
+                          [(0, 0.5), (1, 1.0)])
+        with wave.open(io.BytesIO(result), "rb") as wav:
+            self.assertAlmostEqual(wav.getnframes() / wav.getframerate(), 2, places=2)
+            samples = array("h", wav.readframes(wav.getnframes()))[::2]
+        def amplitude(frequency, start, end):
+            first, last = round(start * 44100), round(end * 44100)
+            return 2 * sum(samples[i] / 32768 * math.sin(2 * math.pi * frequency * i / 44100)
+                           for i in range(first, last)) / (last - first)
+        self.assertGreater(amplitude(440, 0.55, 0.65), 0.04)
+        self.assertLess(abs(amplitude(880, 0.55, 0.65)), 0.001)
+        self.assertGreater(amplitude(880, 1.05, 1.15), 0.05)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "FFmpeg is required for audio integration tests")
+    def test_all_silent_voices_return_backing_without_extending_song(self):
+        result = mix_song(wav_bytes(1), [wav_bytes(amplitude=0)], [(0, 5)])
+        with wave.open(io.BytesIO(result), "rb") as wav:
+            self.assertAlmostEqual(wav.getnframes() / wav.getframerate(), 1, places=2)
+            self.assertGreater(max(abs(x) for x in array("h", wav.readframes(wav.getnframes()))), 1000)
 
     @unittest.skipUnless(shutil.which("ffmpeg"), "FFmpeg is required for audio integration tests")
     def test_padded_voice_starts_at_requested_beat(self):
