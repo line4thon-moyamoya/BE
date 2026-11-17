@@ -78,5 +78,64 @@ class PronunciationVariantGeneratorTest {
 
         assertThat(variants.get(0)).isEqualTo("고양이");
     }
+
+    @Test
+    void reverseInitialSubstitution() {
+        assertThat(generator.generateDictionaryQueries("데금", true))
+                .contains("데금", "세금");
+    }
+
+    @Test
+    void reverseFinalConsonantDeletion() {
+        assertThat(generator.generateDictionaryQueries("토장", true))
+                .contains("토장", "통장");
+    }
+
+    @Test
+    void reverseVowelSubstitution() {
+        assertThat(generator.generateDictionaryQueries("헤식", false))
+                .contains("회식");
+    }
+
+    @Test
+    void reverseVowelShouldFindComputer() {
+        assertThat(generator.generateDictionaryQueries("컴퓨타", false))
+                .contains("컴퓨터");
+    }
+
+    @Test
+    void firstPassQueriesShouldBeLimited() {
+        assertThat(generator.generateDictionaryQueries("컴퓨타", true))
+                .hasSizeLessThanOrEqualTo(10)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
+    void secondPassQueriesShouldBeLimited() {
+        assertThat(generator.generateDictionaryQueries("컴퓨타", false))
+                .hasSizeLessThanOrEqualTo(25)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
+    void originalExpressionShouldBeFirstDictionaryQuery() {
+        assertThat(generator.generateDictionaryQueries("토장", true)
+                .getFirst()).isEqualTo("토장");
+    }
+
+    @Test
+    void secondPassShouldExpandDictionaryQueries() {
+        List<String> firstQueries =
+                generator.generateDictionaryQueries("보이더", true);
+
+        List<String> secondQueries =
+                generator.generateDictionaryQueries("보이더", false);
+
+        assertThat(secondQueries)
+                .hasSizeGreaterThan(firstQueries.size())
+                .hasSizeLessThanOrEqualTo(25)
+                .doesNotHaveDuplicates()
+                .contains("보이더");
+    }
 }
 

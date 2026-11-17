@@ -110,6 +110,29 @@ class QuestionControllerTest {
     }
 
     @Test
+    void analyzeReturnsQuestion400WhenBadWordDetected() throws Exception {
+        when(questionService.analyzeAudio(eq(7L), eq(2L), any()))
+                .thenThrow(new CustomException(QuestionErrorCode.BAD_WORD_DETECTED));
+
+        MockMultipartFile audio = new MockMultipartFile(
+                "audio",
+                "voice.wav",
+                "audio/wav",
+                "fake-wav".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/questions/analyze")
+                        .file(audio)
+                        .param("childId", "2")
+                        .principal(() -> "7"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("QUESTION_400_BAD_WORD"))
+                .andExpect(jsonPath("$.message")
+                        .value("질문에 금칙어가 포함되어 있습니다."));
+    }
+
+    @Test
     void clarifyReturnsExpectedResponse() throws Exception {
         when(questionService.findSecondCandidates(7L, "session-1", com.moyamoya.domain.word.entity.HeardFrom.PARENTS))
                 .thenReturn(new SecondCandidateResponse(

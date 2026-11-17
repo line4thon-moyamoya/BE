@@ -19,6 +19,6 @@ class QuestionDataLoaderTest {
         assertThat(loader.getConfig()).isNotNull();
         assertThat(loader.getPronunciationRules()).isNotNull();
         assertThat(loader.getPronunciationRules()
-                .path("rules").size()).isEqualTo(22);
+                .path("rules").size()).isEqualTo(24);
     }
 }

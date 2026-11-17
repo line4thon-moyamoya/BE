@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import com.moyamoya.domain.word.entity.HeardFrom;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +19,7 @@ public class CandidateRankingService {
     private final PronunciationSimilarity similarity;
     private final PronunciationVariantGenerator variantGenerator;
     private final ContextScoringService contextScoringService;
+    private final BadWordFilterService badWordFilterService;
 
     // 초기 실험값 (테스트 후 조정)
     private static final double MIN_SCORE = 0.60;
@@ -44,6 +44,9 @@ public class CandidateRankingService {
     private static final double HIGH_PENALTY = 0.03;
     private static final double MEDIUM_PENALTY = 0.06;
     private static final double LOW_PENALTY = 0.10;
+
+    // F2 복합 발음 규칙 평가 제한
+    private static final int MAX_COMPOUND_BASE_VARIANTS = 40;
 
     // 일치 유형: 숫자가 높을수록 정렬 우선
     private enum MatchType {
@@ -79,11 +82,6 @@ public class CandidateRankingService {
             double finalScore
     ) {}
 
-    /**
-     * 119개 단어에서 1차 후보 0~3개 선정
-     * targetExpressions[0] = 원본
-     * targetExpressions[1...] = 조사 제거형
-     */
     public List<WordCandidate> rankFirst(
             List<String> targetExpressions
     ) {
@@ -102,8 +100,15 @@ public class CandidateRankingService {
                 continue;
             }
 
+            if (badWordFilterService.containsBlockedText(data.word())
+                    || badWordFilterService.containsBlockedText(
+                    data.definition()
+            )) {
+                continue;
+            }
+
             MatchResult match = calculateBestMatch(
-                    expressions, data
+                    expressions, data, true
             );
 
             if (match.score() >= MIN_SCORE) {
@@ -195,15 +200,6 @@ public class CandidateRankingService {
         boolean hasSource = heardFrom != null
                 && heardFrom != HeardFrom.UNKNOWN;
 
-        double pronWeight = SECOND_PRON_WEIGHT;
-        double contextWeight = hasContext
-                ? SECOND_CONTEXT_WEIGHT : 0.0;
-        double sourceWeight = hasSource
-                ? SECOND_SOURCE_WEIGHT : 0.0;
-
-        double totalWeight =
-                pronWeight + contextWeight + sourceWeight;
-
         List<SecondScoredWord> scored = new ArrayList<>();
 
         for (QuestionWordData data : dataLoader.getWords()) {
@@ -212,13 +208,34 @@ public class CandidateRankingService {
                 continue;
             }
 
-            String candidateKey = "CURATED:" + data.word();
-
-            if (excluded.contains(candidateKey)) {
+            if (badWordFilterService.containsBlockedText(data.word())
+                    || badWordFilterService.containsBlockedText(
+                    data.definition()
+            )) {
                 continue;
             }
 
-            MatchResult match = calculateBestMatch(expressions, data);
+            String wordKey = data.word()
+                    .trim()
+                    .toLowerCase(Locale.ROOT);
+
+            boolean alreadyShown = excluded.stream()
+                    .filter(Objects::nonNull)
+                    .map(value ->
+                            value.trim().toLowerCase(Locale.ROOT)
+                    )
+                    .anyMatch(value ->
+                            value.equals(wordKey)
+                                    || value.endsWith(":" + wordKey)
+                    );
+
+            if (alreadyShown) {
+                continue;
+            }
+
+            MatchResult match = calculateBestMatch(
+                    expressions, data, false
+            );
             double pronunciationScore = match.score();
 
             if (pronunciationScore < SECOND_MIN_PRON_SCORE) {
@@ -237,12 +254,10 @@ public class CandidateRankingService {
             )
                     : 0.0;
 
-            double finalScore = clamp(
-                    (
-                            pronunciationScore * pronWeight
-                                    + contextScore * contextWeight
-                                    + sourceScore * sourceWeight
-                    ) / totalWeight
+            double finalScore = calculateSecondPassScore(
+                    pronunciationScore,
+                    hasContext ? contextScore : null,
+                    hasSource ? sourceScore : null
             );
 
             if (finalScore < SECOND_MIN_SCORE) {
@@ -285,38 +300,100 @@ public class CandidateRankingService {
                 .toList();
     }
 
+    // 기존 호출부 호환
     public double calculateExternalPronunciationScore(
             List<String> targetExpressions,
             String word
+    ) {
+        return calculateExternalPronunciationScore(
+                targetExpressions, word, true
+        );
+    }
+
+    // F1/F2 공통 외부 단어 발음 평가
+    public double calculateExternalPronunciationScore(
+            List<String> targetExpressions,
+            String word,
+            boolean isFirstPass
     ) {
         if (word == null || word.isBlank()) {
             return 0.0;
         }
 
-        List<String> expressions = normalizeExpressions(targetExpressions);
+        List<String> expressions =
+                normalizeExpressions(targetExpressions);
+
         if (expressions.isEmpty()) {
             return 0.0;
         }
 
-        QuestionWordData data = new QuestionWordData(
-                word,
-                word,
-                null,
-                null,
-                null,
-                null,
-                null,
-                word,
-                word,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+        word = word.trim();
+
+        return calculateExternalPronunciationScore(
+                targetExpressions,
+                new QuestionWordData(
+                        word,
+                        word,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        word,
+                        word,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ),
+                isFirstPass
+        );
+    }
+
+    // CSV 원본 데이터(발음 필드 포함) 기반 평가
+    public double calculateExternalPronunciationScore(
+            List<String> targetExpressions,
+            QuestionWordData data,
+            boolean isFirstPass
+    ) {
+        if (data == null || data.word() == null || data.word().isBlank()) {
+            return 0.0;
+        }
+
+        List<String> expressions =
+                normalizeExpressions(targetExpressions);
+
+        if (expressions.isEmpty()) {
+            return 0.0;
+        }
+
+        String normalizedWord = data.word().trim();
+
+        QuestionWordData normalizedData = new QuestionWordData(
+                normalizedWord,
+                data.matchKey(),
+                data.category(),
+                data.heardFrom(),
+                data.heardNote(),
+                data.hearsExample(),
+                data.pronPoint(),
+                data.pronExpected(),
+                data.pronActualAge3(),
+                data.confusableWord(),
+                data.definition(),
+                data.hint(),
+                data.descAge3To4(),
+                data.descAge5(),
+                data.example()
         );
 
-        return calculateBestMatch(expressions, data).score();
+        return calculateBestMatch(
+                expressions,
+                normalizedData,
+                isFirstPass
+        ).score();
     }
 
     public boolean containsCsvWord(String word) {
@@ -336,6 +413,38 @@ public class CandidateRankingService {
         return List.copyOf(dataLoader.getWords());
     }
 
+    public double calculateSecondPassScore(
+            double pronunciationScore,
+            Double contextScore,
+            Double sourceScore
+    ) {
+        double weightedScore =
+                clamp(pronunciationScore)
+                        * SECOND_PRON_WEIGHT;
+
+        double totalWeight = SECOND_PRON_WEIGHT;
+
+        if (contextScore != null) {
+
+            weightedScore +=
+                    clamp(contextScore)
+                            * SECOND_CONTEXT_WEIGHT;
+
+            totalWeight += SECOND_CONTEXT_WEIGHT;
+        }
+
+        if (sourceScore != null) {
+
+            weightedScore +=
+                    clamp(sourceScore)
+                            * SECOND_SOURCE_WEIGHT;
+
+            totalWeight += SECOND_SOURCE_WEIGHT;
+        }
+
+        return clamp(weightedScore / totalWeight);
+    }
+
     // 원본과 조사 제거형 정리
     private List<String> normalizeExpressions(
             List<String> targetExpressions
@@ -352,12 +461,10 @@ public class CandidateRankingService {
                 .toList();
     }
 
-    /**
-     * 단어별 최고 일치 결과 계산
-     */
     private MatchResult calculateBestMatch(
             List<String> expressions,
-            QuestionWordData data
+            QuestionWordData data,
+            boolean isFirstPass
     ) {
         String word = data.word().trim();
 
@@ -377,18 +484,17 @@ public class CandidateRankingService {
             );
         }
 
-        // 원본 표기와 CSV 발음 별칭을 구분
         Set<String> csvPronunciations =
                 new LinkedHashSet<>();
 
         addPronunciations(
                 csvPronunciations, data.pronExpected()
         );
+
         addPronunciations(
                 csvPronunciations, data.pronActualAge3()
         );
 
-        // 기본 표기 및 CSV 발음을 규칙 생성의 기반으로 사용
         Set<String> basePronunciations =
                 new LinkedHashSet<>();
 
@@ -401,11 +507,14 @@ public class CandidateRankingService {
 
         // 3. 사전 표기 및 CSV 발음과 비교
         for (int i = 0; i < expressions.size(); i++) {
+
             String expression = expressions.get(i);
+
             double penalty = i == 0
                     ? 0.0 : STRIPPED_PENALTY;
 
             for (String pronunciation : basePronunciations) {
+
                 double score = similarity.calculate(
                         expression, pronunciation
                 );
@@ -416,7 +525,6 @@ public class CandidateRankingService {
                                 ? MatchType.CSV_PRONUNCIATION
                                 : MatchType.SIMILARITY;
 
-                // 정확 CSV 발음은 일치 유형으로 보호
                 double adjusted = clamp(score - penalty);
 
                 best = better(
@@ -426,10 +534,12 @@ public class CandidateRankingService {
             }
         }
 
-        // 4. JSON 규칙 변형 발음과 비교
-        Map<String, Double> variants = new LinkedHashMap<>();
+        // 4. 단일 발음 규칙 변형
+        Map<String, Double> variants =
+                new LinkedHashMap<>();
 
         for (String pronunciation : basePronunciations) {
+
             for (PronunciationVariantGenerator.PronunciationVariant variant
                     : variantGenerator.generateDetailed(pronunciation)) {
 
@@ -437,7 +547,6 @@ public class CandidateRankingService {
                         variant.priority()
                 );
 
-                // 같은 발음이 여러 경로에서 나오면 낮은 감점 유지
                 variants.merge(
                         variant.pronunciation(),
                         penalty,
@@ -446,11 +555,13 @@ public class CandidateRankingService {
             }
         }
 
-        // 기존 표기와 CSV 발음은 규칙 변형에서 제외
         basePronunciations.forEach(variants::remove);
 
+        // 단일 규칙 발음 + 자모 유사도 평가
         for (int i = 0; i < expressions.size(); i++) {
+
             String expression = expressions.get(i);
+
             double expressionPenalty = i == 0
                     ? 0.0 : STRIPPED_PENALTY;
 
@@ -462,18 +573,94 @@ public class CandidateRankingService {
                 );
 
                 double adjusted = clamp(
-                        score - expressionPenalty - entry.getValue()
+                        score
+                                - expressionPenalty
+                                - entry.getValue()
                 );
 
-                // 규칙 발음과 정확히 일치한 경우만 RULE_VARIANT
-                MatchType type = expression.equals(entry.getKey())
-                        ? MatchType.RULE_VARIANT
-                        : MatchType.SIMILARITY;
+                MatchType type =
+                        expression.equals(entry.getKey())
+                                ? MatchType.RULE_VARIANT
+                                : MatchType.SIMILARITY;
 
                 best = better(
                         best,
                         new MatchResult(adjusted, type)
                 );
+            }
+        }
+
+        // 5. F2에서만 복합 발음 규칙 평가
+        if (!isFirstPass) {
+
+            best = evaluateCompoundVariants(
+                    expressions,
+                    variants,
+                    best
+            );
+        }
+
+        return best;
+    }
+
+    private MatchResult evaluateCompoundVariants(
+            List<String> expressions,
+            Map<String, Double> firstVariants,
+            MatchResult currentBest
+    ) {
+        MatchResult best = currentBest;
+
+        // 감점이 적은 변형부터 추가 탐색
+        List<Map.Entry<String, Double>> sortedVariants =
+                firstVariants.entrySet()
+                        .stream()
+                        .sorted(Map.Entry.comparingByValue())
+                        .limit(MAX_COMPOUND_BASE_VARIANTS)
+                        .toList();
+
+        for (Map.Entry<String, Double> first
+                : sortedVariants) {
+
+            List<PronunciationVariantGenerator.PronunciationVariant>
+                    secondVariants =
+                    variantGenerator.generateDetailed(
+                            first.getKey()
+                    );
+
+            for (var second : secondVariants) {
+
+                double totalPenalty =
+                        first.getValue()
+                                + rulePenalty(second.priority());
+
+                for (int i = 0; i < expressions.size(); i++) {
+
+                    String expression = expressions.get(i);
+
+                    // 복합 규칙은 정확하게 일치할 때만 인정
+                    if (!expression.equals(
+                            second.pronunciation()
+                    )) {
+                        continue;
+                    }
+
+                    double expressionPenalty = i == 0
+                            ? 0.0 : STRIPPED_PENALTY;
+
+                    double adjusted = clamp(
+                            1.0
+                                    - totalPenalty
+                                    - expressionPenalty
+                    );
+
+                    best = better(
+                            best,
+                            new MatchResult(
+                                    adjusted,
+                                    MatchType.RULE_VARIANT
+                            )
+                    );
+                }
             }
         }
 
@@ -525,46 +712,6 @@ public class CandidateRankingService {
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .forEach(pronunciations::add);
-    }
-
-    /**
-     * 조사 제거형을 질문 기록에 반영할 수 있는지 판단
-     * 정확히 하나의 사전 단어만 일치할 때 선택
-     */
-    public Optional<String> resolveTargetPronunciation(
-            List<String> targetExpressions
-    ) {
-        List<String> expressions = normalizeExpressions(
-                targetExpressions
-        );
-
-        if (expressions.isEmpty()) {
-            return Optional.empty();
-        }
-
-        String original = expressions.get(0);
-
-        Set<String> dictionaryWords = dataLoader.getWords()
-                .stream()
-                .map(QuestionWordData::word)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        if (dictionaryWords.contains(original)) {
-            return Optional.of(original);
-        }
-
-        List<String> matches = expressions.stream()
-                .skip(1)
-                .filter(dictionaryWords::contains)
-                .distinct()
-                .toList();
-
-        if (matches.size() == 1) {
-            return Optional.of(matches.get(0));
-        }
-
-        return Optional.empty();
     }
 
     private WordCandidate toCandidate(ScoredWord scored) {

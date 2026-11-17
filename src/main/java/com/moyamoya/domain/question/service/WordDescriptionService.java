@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 public class WordDescriptionService {
 
     private final OpenAiClient openAiClient;
+    private final BadWordFilterService badWordFilterService;
 
     private String loadPrompt() {
         try {
@@ -84,7 +85,18 @@ public class WordDescriptionService {
             return null;
         }
 
-        return cleanDescription(result, word);
+        String description = cleanDescription(result, word);
+
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+
+        if (badWordFilterService.containsBlockedText(description)) {
+            log.warn("금칙어 포함으로 설명 생성 결과 제외");
+            return null;
+        }
+
+        return description;
     }
 
     // LLM 응답에서 불필요한 단어/설명 라벨 제거

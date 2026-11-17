@@ -57,6 +57,12 @@ public enum QuestionErrorCode implements BaseErrorCode {
             HttpStatus.BAD_REQUEST
     ),
 
+    BAD_WORD_DETECTED(
+            "QUESTION_400_BAD_WORD",
+            "질문에 금칙어가 포함되어 있습니다.",
+            HttpStatus.BAD_REQUEST
+    ),
+
     STT_NO_SPEECH(
             "QUESTION422_NO_SPEECH",
             "음성을 인식하지 못했어요. 다시 말해 주세요.",

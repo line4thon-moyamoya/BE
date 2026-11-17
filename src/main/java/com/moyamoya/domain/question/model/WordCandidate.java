@@ -109,4 +109,25 @@ public record WordCandidate(
                 easyDescription
         );
     }
+
+    public WordCandidate withScores(
+            double newContextScore,
+            double newFinalScore
+    ) {
+        return new WordCandidate(
+                candidateId,
+                wordId,
+                word,
+                sourceType,
+                pronunciationScore,
+                newContextScore,
+                newFinalScore,
+                definition,
+                imageUrl,
+                wordAudioUrl,
+                wordAudioBase64,
+                wordAudioContentType,
+                easyDescription
+        );
+    }
 }

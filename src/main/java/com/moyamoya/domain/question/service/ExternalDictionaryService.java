@@ -4,15 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.model.DictionaryEntry;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import lombok.extern.slf4j.Slf4j;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Service
 public class ExternalDictionaryService {
 
@@ -52,42 +52,20 @@ public class ExternalDictionaryService {
     }
 
     public List<DictionaryEntry> searchExactMatches(String word) {
-        if (!StringUtils.hasText(word) || !StringUtils.hasText(apiKey)) {
+        if (!StringUtils.hasText(word)
+                || !StringUtils.hasText(apiKey)) {
             return List.of();
         }
 
-        String normalized = word.trim();
-
-        URI uri = UriComponentsBuilder
-                .fromUriString(baseUrl + "/search.do")
-                .queryParam("key", apiKey)
-                .queryParam("q", "{searchWord}")
-                .queryParam("req_type", "json")
-                .queryParam("method", "exact")
-                .encode(StandardCharsets.UTF_8)
-                .buildAndExpand(normalized)
-                .toUri();
-
         try {
-            String body = restClient.get()
-                    .uri(uri)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, response) -> {
-                        throw new RestClientException("Dictionary API error: " + response.getStatusCode());
-                    })
-                    .body(String.class);
+            return searchExactMatchesStrict(word);
 
-            if (body == null || body.isBlank()) {
-                return List.of();
-            }
-
-            JsonNode root = objectMapper.readTree(body);
-            return parseEntries(root);
-        } catch (RestClientException e) {
-            return List.of();
         } catch (RuntimeException e) {
-            return List.of();
-        } catch (Exception e) {
+            log.warn(
+                    "외부 사전 후보 검색 실패: {}",
+                    e.getClass().getSimpleName()
+            );
+
             return List.of();
         }
     }
@@ -125,8 +103,18 @@ public class ExternalDictionaryService {
             }
 
             JsonNode root = objectMapper.readTree(body);
+
+            if (root == null || !root.path("channel").isObject()) {
+                throw new IllegalStateException(
+                        "올바르지 않은 사전 응답입니다."
+                );
+            }
+
             return parseEntries(root).stream()
-                    .filter(entry -> normalized.equals(entry.word()))
+                    .filter(entry -> entry.word() != null)
+                    .filter(entry ->
+                            normalized.equals(entry.word().trim())
+                    )
                     .toList();
 
         } catch (Exception e) {
