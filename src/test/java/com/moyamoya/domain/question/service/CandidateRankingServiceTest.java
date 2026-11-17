@@ -79,12 +79,20 @@ class CandidateRankingServiceTest {
     }
 
     @Test
-    void originalExpressionShouldBePreservedWhenItIsAWord() {
-        assertThat(
-                rankingService.resolveTargetPronunciation(
-                        List.of("세금", "세")
-                )
-        ).contains("세금");
+    void calculateSecondPassScoreUsesAvailableSignals() {
+        double withAllSignals = rankingService.calculateSecondPassScore(
+                0.8,
+                0.6,
+                0.4
+        );
+        double withPronunciationOnly = rankingService.calculateSecondPassScore(
+                0.8,
+                null,
+                null
+        );
+
+        assertThat(withAllSignals).isGreaterThan(0.0).isLessThanOrEqualTo(1.0);
+        assertThat(withPronunciationOnly).isEqualTo(0.8);
     }
 
     @Test

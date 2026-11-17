@@ -27,10 +27,10 @@
       "type": "INITIAL_SUBSTITUTION",
       "from": ["ㅆ"],
       "to": ["ㄸ"],
-      "position": "INITIAL",
+      "position": "INITIAL_OR_MEDIAL",
       "priority": "HIGH",
       "enabled": true,
-      "examples": ["받아쓰기:바다뜨기"]
+      "examples": ["쓰기:뜨기", "받아쓰기:받아뜨기"]
     },
     {
       "id": 4,
@@ -222,6 +222,26 @@
       "priority": "HIGH",
       "enabled": false,
       "examples": ["분리수거:불리수거", "적금:저끔", "잡다:자따"]
+    },
+    {
+      "id": 23,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅓ"],
+      "to": ["ㅏ"],
+      "position": "VOWEL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["컴퓨터:컴퓨타"]
+    },
+    {
+      "id": 24,
+      "type": "VOWEL_SUBSTITUTION",
+      "from": ["ㅐ", "ㅔ"],
+      "to": ["ㅔ", "ㅐ"],
+      "position": "VOWEL",
+      "priority": "MEDIUM",
+      "enabled": true,
+      "examples": ["냉장고:넹장고", "세금:새금"]
     }
   ]
 }

@@ -13,12 +13,17 @@ import static org.mockito.Mockito.when;
 class WordDescriptionServiceTest {
 
     private OpenAiClient openAiClient;
+    private BadWordFilterService badWordFilterService;
     private WordDescriptionService service;
 
     @BeforeEach
     void setUp() {
         openAiClient = mock(OpenAiClient.class);
-        service = new WordDescriptionService(openAiClient);
+        badWordFilterService = mock(BadWordFilterService.class);
+        service = new WordDescriptionService(
+                openAiClient,
+                badWordFilterService
+        );
     }
 
     @Test

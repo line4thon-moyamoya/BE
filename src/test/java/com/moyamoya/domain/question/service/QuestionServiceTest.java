@@ -39,7 +39,8 @@ class QuestionServiceTest {
     private QuestionTargetExtractor targetExtractor;
     private JosaCandidateGenerator josaGenerator;
     private CandidateSearchService candidateSearchService;
-    private CandidateRankingService rankingService;
+    private TargetPronunciationResolver targetPronunciationResolver;
+    private BadWordFilterService badWordFilterService;
     private SttService sttService;
     private CandidateTtsService candidateTtsService;
     private MoyaTtsService moyaTtsService;
@@ -56,7 +57,8 @@ class QuestionServiceTest {
         targetExtractor = mock(QuestionTargetExtractor.class);
         josaGenerator = mock(JosaCandidateGenerator.class);
         candidateSearchService = mock(CandidateSearchService.class);
-        rankingService = mock(CandidateRankingService.class);
+        targetPronunciationResolver = mock(TargetPronunciationResolver.class);
+        badWordFilterService = mock(BadWordFilterService.class);
         sttService = mock(SttService.class);
         candidateTtsService = mock(CandidateTtsService.class);
         moyaTtsService = mock(MoyaTtsService.class);
@@ -74,7 +76,8 @@ class QuestionServiceTest {
                 targetExtractor,
                 josaGenerator,
                 candidateSearchService,
-                rankingService,
+                targetPronunciationResolver,
+                badWordFilterService,
                 sttService,
                 candidateTtsService,
                 moyaTtsService,
@@ -111,7 +114,7 @@ class QuestionServiceTest {
                         null,
                         null
                 )));
-        when(rankingService.resolveTargetPronunciation(any()))
+        when(targetPronunciationResolver.resolve(any(), any()))
                 .thenReturn(Optional.empty());
         stubChildOwnership(1L, 1L);
 
@@ -145,6 +148,34 @@ class QuestionServiceTest {
         assertThat(response.candidates().getFirst().candidateId()).isEqualTo("c_001");
         assertThat(response.dialogue()).isNotNull();
         assertThat(response.dialogue().audioContentType()).isEqualTo("audio/wav");
+    }
+
+    @Test
+    void testSttThrowsBadWordDetectedWhenSentenceContainsBlockedText() {
+        when(badWordFilterService.containsBlockedText("금칙어 포함 질문"))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> questionService.testStt(1L, "금칙어 포함 질문"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> assertThat(((CustomException) exception).getErrorCode())
+                        .isEqualTo(QuestionErrorCode.BAD_WORD_DETECTED));
+    }
+
+    @Test
+    void testSttThrowsBadWordDetectedWhenJosaExpressionContainsBlockedText() {
+        when(targetExtractor.extract("엄마, 데금이가 뭐야?"))
+                .thenReturn(QuestionExtractionResult.success("엄마, 데금이가 뭐야?", "데금이가"));
+        when(josaGenerator.generate("데금이가"))
+                .thenReturn(List.of("데금이가", "데금"));
+        when(badWordFilterService.containsBlockedText("데금이가"))
+                .thenReturn(false);
+        when(badWordFilterService.containsBlockedText("데금"))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> questionService.testStt(1L, "엄마, 데금이가 뭐야?"))
+                .isInstanceOf(CustomException.class)
+                .satisfies(exception -> assertThat(((CustomException) exception).getErrorCode())
+                        .isEqualTo(QuestionErrorCode.BAD_WORD_DETECTED));
     }
 
     @Test
@@ -212,6 +243,69 @@ class QuestionServiceTest {
     }
 
     @Test
+    void findSecondCandidatesFiltersBlockedCandidates() {
+        QuestionSession session = QuestionSession.create(1L, "엄마 저끔이 뭐야?", null);
+        session.setExtractionResult("저끔", List.of("저끔"));
+        session.setFirstCandidates(List.of());
+
+        List<WordCandidate> secondCandidates = List.of(
+                new WordCandidate(
+                        "CURATED:금칙어",
+                        null,
+                        "금칙어",
+                        WordSourceType.CURATED,
+                        0.9,
+                        0.7,
+                        0.85,
+                        "정의",
+                        null,
+                        null,
+                        null,
+                        null
+                ),
+                new WordCandidate(
+                        "CURATED:연금",
+                        null,
+                        "연금",
+                        WordSourceType.CURATED,
+                        0.8,
+                        0.6,
+                        0.75,
+                        "정의2",
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+
+        when(sessionStore.find(session.getSessionId())).thenReturn(Optional.of(session));
+        stubChildOwnership(1L, 1L);
+        when(candidateSearchService.searchSecondCandidates(
+                List.of("저끔"),
+                "엄마 저끔이 뭐야?",
+                HeardFrom.PARENTS,
+                Set.of()
+        )).thenReturn(secondCandidates);
+        when(wordRepository.findByWord("연금")).thenReturn(Optional.empty());
+        when(wordDescriptionService.generate(
+                "연금",
+                "정의2",
+                AgeGroup.AGE_3_4
+        )).thenReturn("나중에 쓸 돈을 조금씩 받는 거야.");
+        when(badWordFilterService.containsBlockedText("금칙어")).thenReturn(true);
+
+        var response = questionService.findSecondCandidates(
+                1L,
+                session.getSessionId().toString(),
+                HeardFrom.PARENTS
+        );
+
+        assertThat(response.candidates()).hasSize(1);
+        assertThat(response.candidates().getFirst().word()).isEqualTo("연금");
+    }
+
+    @Test
     void testSttThrowsTtsGenerationFailedWhenDialogueTtsFails() {
         when(targetExtractor.extract("엄마, 데금이 뭐야?"))
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이 뭐야?", "데금이"));
@@ -232,7 +326,7 @@ class QuestionServiceTest {
                         null,
                         null
                 )));
-        when(rankingService.resolveTargetPronunciation(any()))
+        when(targetPronunciationResolver.resolve(any(), any()))
                 .thenReturn(Optional.empty());
         stubChildOwnership(1L, 1L);
         when(wordRepository.findByWord("세금")).thenReturn(Optional.empty());

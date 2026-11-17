@@ -1,0 +1,82 @@
+package com.moyamoya.domain.question.service;
+
+import com.moyamoya.domain.question.config.QuestionDataLoader;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.text.Normalizer;
+import java.util.Locale;
+
+@Service
+@RequiredArgsConstructor
+public class BadWordFilterService {
+
+    private final QuestionDataLoader dataLoader;
+    private final CandidateRankingService rankingService;
+
+    public boolean isBlockedWord(String word) {
+        String normalized = normalize(word);
+
+        if (normalized.isBlank()) {
+            return false;
+        }
+
+        // 금칙어 완전 일치는 무조건 차단
+        return dataLoader.getBadwords().stream()
+                .map(this::normalize)
+                .anyMatch(normalized::equals);
+    }
+
+    public boolean containsBlockedText(String text) {
+
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        String normalized = normalize(text);
+        String[] tokens = normalized.split(
+                "[\\s\\p{P}\\p{Z}]+"
+        );
+
+        for (String token : tokens) {
+
+            if (token.isBlank()) {
+                continue;
+            }
+
+            if (isBlockedWord(token)) {
+                return true;
+            }
+
+            // 검수된 정상 단어는 부분 일치 검사 제외
+            if (rankingService.containsCsvWord(token)) {
+                continue;
+            }
+
+            boolean blocked = dataLoader.getBadwords()
+                    .stream()
+                    .map(this::normalize)
+                    .filter(word -> word.length() >= 3)
+                    .anyMatch(token::contains);
+
+            if (blocked) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private String normalize(String text) {
+
+        if (text == null) {
+            return "";
+        }
+
+        return Normalizer.normalize(
+                        text, Normalizer.Form.NFKC
+                )
+                .toLowerCase(Locale.ROOT)
+                .trim();
+    }
+}

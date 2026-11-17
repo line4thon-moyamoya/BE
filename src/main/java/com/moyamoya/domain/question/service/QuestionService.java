@@ -40,7 +40,8 @@ public class QuestionService {
     private final QuestionTargetExtractor targetExtractor;
     private final JosaCandidateGenerator josaGenerator;
     private final CandidateSearchService candidateSearchService;
-    private final CandidateRankingService rankingService;
+    private final TargetPronunciationResolver targetPronunciationResolver;
+    private final BadWordFilterService badWordFilterService;
     private final SttService sttService;
     private final CandidateTtsService candidateTtsService;
     private final MoyaTtsService moyaTtsService;
@@ -156,10 +157,20 @@ public class QuestionService {
                     excludedKeys
             );
 
-            List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(
-                    candidates,
-                    session.getChildId()
-            );
+            // F2에서 발견한 후보까지 활용하여 발음 재판단
+            targetPronunciationResolver
+                    .resolve(session.getTargetExpressions(), candidates)
+                    .ifPresent(session::updateTargetPronunciation);
+
+            List<WordCandidate> enrichedCandidates =
+                    enrichCandidatesWithWordData(
+                            candidates,
+                            session.getChildId()
+                    )
+                            .stream()
+                            .filter(this::isSafeCandidate)
+                            .toList();
+
             List<WordCandidate> candidatesWithTts;
             try {
                 candidatesWithTts = enrichCandidatesWithTts(
@@ -217,6 +228,13 @@ public class QuestionService {
 
         String sentence = recognizedSentence.trim();
 
+        // 질문 원문 금칙어 검사
+        if (badWordFilterService.containsBlockedText(sentence)) {
+            throw new CustomException(
+                    QuestionErrorCode.BAD_WORD_DETECTED
+            );
+        }
+
         QuestionSession session = QuestionSession.create(
                 childId,
                 sentence,
@@ -238,20 +256,38 @@ public class QuestionService {
 
         List<String> expressions = josaGenerator.generate(recognizedText);
 
+        // 원본 추출 표현 및 조사 제거형 금칙어 검사
+        if (expressions.stream()
+                .anyMatch(badWordFilterService::containsBlockedText)) {
+            throw new CustomException(
+                    QuestionErrorCode.BAD_WORD_DETECTED
+            );
+        }
+
         try {
             session.setExtractionResult(recognizedText, expressions);
 
-            rankingService.resolveTargetPronunciation(expressions)
-                    .ifPresent(session::updateTargetPronunciation);
         } catch (IllegalArgumentException exception) {
             throw new CustomException(QuestionErrorCode.INVALID_QUESTION_REQUEST);
         } catch (IllegalStateException exception) {
             throw new CustomException(QuestionErrorCode.INVALID_SESSION_STATE);
         }
 
-        List<WordCandidate> candidates = candidateSearchService.searchFirstCandidates(expressions);
-        List<WordCandidate> enrichedCandidates = enrichCandidatesWithWordData(candidates, childId);
+        List<WordCandidate> candidates =
+                candidateSearchService.searchFirstCandidates(expressions);
+
+        // 탐색 결과를 활용하여 기록할 발음 결정
+        targetPronunciationResolver
+                .resolve(expressions, candidates)
+                .ifPresent(session::updateTargetPronunciation);
+
+        List<WordCandidate> enrichedCandidates =
+                enrichCandidatesWithWordData(candidates, childId)
+                        .stream()
+                        .filter(this::isSafeCandidate)
+                        .toList();
         List<WordCandidate> candidatesWithTts;
+
         try {
             candidatesWithTts = enrichCandidatesWithTts(
                     enrichedCandidates
@@ -457,5 +493,17 @@ public class QuestionService {
         }
 
         return "PHONETIC";
+    }
+
+    private boolean isSafeCandidate(WordCandidate candidate) {
+        return !badWordFilterService.containsBlockedText(
+                candidate.word()
+        )
+                && !badWordFilterService.containsBlockedText(
+                candidate.definition()
+        )
+                && !badWordFilterService.containsBlockedText(
+                candidate.easyDescription()
+        );
     }
 }

@@ -114,6 +114,14 @@ public class QuestionController {
               "data": null
             }
             """;
+    private static final String ANALYZE_BAD_WORD_EXAMPLE = """
+            {
+              "success": false,
+              "code": "QUESTION_400_BAD_WORD",
+              "message": "질문에 금칙어가 포함되어 있습니다.",
+              "data": null
+            }
+            """;
     private static final String ANALYZE_UNAUTHORIZED_EXAMPLE = """
             {
               "success": false,
@@ -472,13 +480,14 @@ public class QuestionController {
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "요청값 오류 또는 잘못된 음성 파일",
+                    description = "요청값 오류, 잘못된 음성 파일, 또는 금칙어 포함",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = BaseResponse.class),
                             examples = {
                                     @ExampleObject(name = "잘못된 요청", value = ANALYZE_INVALID_REQUEST_EXAMPLE),
-                                    @ExampleObject(name = "잘못된 음성 파일", value = ANALYZE_INVALID_AUDIO_EXAMPLE)
+                                    @ExampleObject(name = "잘못된 음성 파일", value = ANALYZE_INVALID_AUDIO_EXAMPLE),
+                                    @ExampleObject(name = "금칙어 포함", value = ANALYZE_BAD_WORD_EXAMPLE)
                             }
                     )
             ),
