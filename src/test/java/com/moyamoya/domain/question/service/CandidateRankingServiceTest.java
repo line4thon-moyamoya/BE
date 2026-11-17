@@ -2,6 +2,7 @@ package com.moyamoya.domain.question.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
+import com.moyamoya.domain.question.model.QuestionWordData;
 import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.word.entity.HeardFrom;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -159,6 +161,29 @@ class CandidateRankingServiceTest {
 
         assertThat(secondScore)
                 .isGreaterThan(firstScore);
+    }
+
+    @Test
+    void curatedCsvDataShouldUseCsvPronunciationFields() {
+        Optional<QuestionWordData> csvData = rankingService.getWords().stream()
+                .filter(data -> "적금".equals(data.word()))
+                .findFirst();
+
+        assertThat(csvData).isPresent();
+
+        double withCsvData = rankingService.calculateExternalPronunciationScore(
+                List.of("저끔"),
+                csvData.get(),
+                true
+        );
+
+        double withWordOnly = rankingService.calculateExternalPronunciationScore(
+                List.of("저끔"),
+                "적금",
+                true
+        );
+
+        assertThat(withCsvData).isGreaterThanOrEqualTo(withWordOnly);
     }
 
     @Test

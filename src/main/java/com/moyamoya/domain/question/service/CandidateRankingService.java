@@ -329,27 +329,69 @@ public class CandidateRankingService {
 
         word = word.trim();
 
-        QuestionWordData data = new QuestionWordData(
-                word,
-                word,
-                null,
-                null,
-                null,
-                null,
-                null,
-                word,
-                word,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+        return calculateExternalPronunciationScore(
+                targetExpressions,
+                new QuestionWordData(
+                        word,
+                        word,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        word,
+                        word,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ),
+                isFirstPass
+        );
+    }
+
+    // CSV 원본 데이터(발음 필드 포함) 기반 평가
+    public double calculateExternalPronunciationScore(
+            List<String> targetExpressions,
+            QuestionWordData data,
+            boolean isFirstPass
+    ) {
+        if (data == null || data.word() == null || data.word().isBlank()) {
+            return 0.0;
+        }
+
+        List<String> expressions =
+                normalizeExpressions(targetExpressions);
+
+        if (expressions.isEmpty()) {
+            return 0.0;
+        }
+
+        String normalizedWord = data.word().trim();
+
+        QuestionWordData normalizedData = new QuestionWordData(
+                normalizedWord,
+                data.matchKey(),
+                data.category(),
+                data.heardFrom(),
+                data.heardNote(),
+                data.hearsExample(),
+                data.pronPoint(),
+                data.pronExpected(),
+                data.pronActualAge3(),
+                data.confusableWord(),
+                data.definition(),
+                data.hint(),
+                data.descAge3To4(),
+                data.descAge5(),
+                data.example()
         );
 
         return calculateBestMatch(
                 expressions,
-                data,
+                normalizedData,
                 isFirstPass
         ).score();
     }

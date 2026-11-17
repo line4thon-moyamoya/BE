@@ -1,6 +1,8 @@
 package com.moyamoya.domain.question.service;
 
+import com.moyamoya.domain.question.model.QuestionWordData;
 import com.moyamoya.domain.question.model.WordCandidate;
+import com.moyamoya.domain.word.entity.WordSourceType;
 import com.moyamoya.domain.word.repository.WordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -147,16 +149,44 @@ public class TargetPronunciationResolver {
             boolean isFirstPass
     ) {
         return candidates.stream()
-                .mapToDouble(candidate ->
-                        rankingService
-                                .calculateExternalPronunciationScore(
-                                        List.of(expression),
-                                        candidate.word(),
-                                        isFirstPass
-                                )
-                )
+                .mapToDouble(candidate -> {
+                    if (candidate.sourceType() == WordSourceType.CURATED) {
+                        Optional<QuestionWordData> csvWord =
+                                findCsvWordData(candidate.word());
+
+                        if (csvWord.isPresent()) {
+                            return rankingService
+                                    .calculateExternalPronunciationScore(
+                                            List.of(expression),
+                                            csvWord.get(),
+                                            isFirstPass
+                                    );
+                        }
+                    }
+
+                    return rankingService
+                            .calculateExternalPronunciationScore(
+                                    List.of(expression),
+                                    candidate.word(),
+                                    isFirstPass
+                            );
+                })
                 .max()
                 .orElse(0.0);
+    }
+
+    private Optional<QuestionWordData> findCsvWordData(String word) {
+        if (word == null || word.isBlank()) {
+            return Optional.empty();
+        }
+
+        String normalized = word.trim();
+
+        return rankingService.getWords().stream()
+                .filter(Objects::nonNull)
+                .filter(data -> data.word() != null)
+                .filter(data -> normalized.equals(data.word().trim()))
+                .findFirst();
     }
 
     private boolean isKnownWord(
