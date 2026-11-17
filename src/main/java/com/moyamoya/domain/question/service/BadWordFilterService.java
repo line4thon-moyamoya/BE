@@ -33,6 +33,18 @@ public class BadWordFilterService {
         }
 
         String normalized = normalize(text);
+
+        // 토큰 분할 전 원문 전체에서 등록된 금칙어 표현을 우선 검사
+        boolean blockedInWholeText = dataLoader.getBadwords()
+                .stream()
+                .map(this::normalize)
+                .filter(word -> !word.isBlank())
+                .anyMatch(normalized::contains);
+
+        if (blockedInWholeText) {
+            return true;
+        }
+
         String[] tokens = normalized.split(
                 "[\\s\\p{P}\\p{Z}]+"
         );
