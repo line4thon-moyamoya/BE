@@ -39,6 +39,7 @@ public class QuestionOtherMeaningService {
     private final OpenAiClient openAiClient;
     private final WordDescriptionService descriptionService;
     private final ObjectMapper objectMapper;
+    private final BadWordFilterService badWordFilterService;
 
     public OtherMeaningsResponse getOtherMeanings(
             Long userId,
@@ -153,11 +154,13 @@ public class QuestionOtherMeaningService {
                 );
             }
 
-            // 7. 현재 제시된 뜻 제외
+            // 7. 현재 제시된 뜻 및 금칙어가 포함된 뜻 제외
             List<DictionaryEntry> alternatives = entries.stream()
                     .filter(entry -> StringUtils.hasText(entry.definition()))
                     .filter(entry -> !normalize(entry.definition())
                             .equals(normalize(candidate.definition())))
+                    .filter(entry -> !badWordFilterService
+                            .containsBlockedText(entry.definition()))
                     .distinct()
                     .toList();
 

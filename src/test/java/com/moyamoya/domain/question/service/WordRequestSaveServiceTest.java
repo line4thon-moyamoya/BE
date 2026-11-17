@@ -17,6 +17,7 @@ import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.global.s3.S3Service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -186,17 +187,39 @@ class WordRequestSaveServiceTest {
 
         verify(s3Service).uploadAudio(expectedKey, bytes, contentType);
         verify(sessionStore).deleteTempAudio(session);
+
+        ArgumentCaptor<WordRequest> captor =
+                ArgumentCaptor.forClass(WordRequest.class);
+
+        verify(wordRequestRepository)
+                .save(captor.capture());
+
+        assertThat(captor.getValue().getRecognizedText())
+                .isEqualTo("적금");
     }
 
     private QuestionSession readySession(String contentType) {
-        QuestionSession session = QuestionSession.create(2L, "적금이 뭐야", null);
+        QuestionSession session =
+                QuestionSession.create(2L, "적금이 뭐야", null);
+
         session.attachOriginalAudio(
                 Path.of("C:\\temp\\audio.tmp"),
                 contentType
         );
-        session.setExtractionResult("적금", List.of("적금"));
+
+        session.setExtractionResult(
+                "적금이",
+                List.of("적금이", "적금")
+        );
+
+        session.updateTargetPronunciation("적금");
+
         session.setFirstCandidates(List.of());
-        session.setSecondCandidates(HeardFrom.PARENTS, List.of());
+        session.setSecondCandidates(
+                HeardFrom.PARENTS,
+                List.of()
+        );
+
         return session;
     }
 
