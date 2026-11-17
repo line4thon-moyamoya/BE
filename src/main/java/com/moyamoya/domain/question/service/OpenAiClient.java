@@ -39,6 +39,14 @@ public class OpenAiClient {
     }
 
     public String generateText(String instructions, String input) {
+        return generateText(instructions, input, 220);
+    }
+
+    public String generateText(
+            String instructions,
+            String input,
+            int maxOutputTokens
+    ) {
         if (!enabled) {
             log.warn("OpenAI API 키가 설정되지 않았습니다.");
             return null;
@@ -53,7 +61,7 @@ public class OpenAiClient {
                     "model", model,
                     "instructions", instructions,
                     "input", input,
-                    "max_output_tokens", 220,
+                    "max_output_tokens", maxOutputTokens,
                     "store", false
             );
 

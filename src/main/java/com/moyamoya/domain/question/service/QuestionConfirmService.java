@@ -40,6 +40,7 @@ public class QuestionConfirmService {
     private final S3Service s3Service;
     private final TransactionTemplate transactionTemplate;
     private final WordDescriptionService wordDescriptionService;
+    private final BadWordFilterService badWordFilterService;
 
     public ConfirmWordResponse confirmWord(
             Long userId,
@@ -96,6 +97,12 @@ public class QuestionConfirmService {
                             QuestionErrorCode.INVALID_CANDIDATE
                     ));
 
+            validateSafeContent(
+                    candidate.word(),
+                    candidate.definition(),
+                    candidate.easyDescription()
+            );
+
             ConfirmWordResponse response = transactionTemplate.execute(status -> {
                 Optional<Word> existingWord = wordRepository.findByWord(
                         candidate.word()
@@ -124,6 +131,12 @@ public class QuestionConfirmService {
                         easyDescription = meaning.description();
                     }
 
+                    validateSafeContent(
+                            candidate.word(),
+                            definition,
+                            easyDescription
+                    );
+                    
                     return createExternalWord(
                             candidate,
                             child,
@@ -334,6 +347,20 @@ public class QuestionConfirmService {
             word.fillMissingDescriptions(easyDescription, null);
         } else if (childAgeGroup == AgeGroup.AGE_5) {
             word.fillMissingDescriptions(null, easyDescription);
+        }
+    }
+
+    private void validateSafeContent(String... texts) {
+        for (String text : texts) {
+            if (!StringUtils.hasText(text)) {
+                continue;
+            }
+
+            if (badWordFilterService.containsBlockedText(text)) {
+                throw new CustomException(
+                        QuestionErrorCode.BAD_WORD_DETECTED
+                );
+            }
         }
     }
 }

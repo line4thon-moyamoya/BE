@@ -15,6 +15,8 @@ import com.moyamoya.domain.word.repository.WordRepository;
 import com.moyamoya.global.exception.CustomException;
 import com.moyamoya.global.s3.S3Service;
 import com.moyamoya.domain.question.session.QuestionSessionStatus;
+import com.moyamoya.domain.word.entity.QuestionHistory;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionCallback;
@@ -43,6 +45,7 @@ class QuestionConfirmServiceTest {
     private S3Service s3Service;
     private TransactionTemplate transactionTemplate;
     private WordDescriptionService wordDescriptionService;
+    private BadWordFilterService badWordFilterService;
 
     private QuestionConfirmService questionConfirmService;
 
@@ -58,6 +61,7 @@ class QuestionConfirmServiceTest {
 
         // 신규 추가: 연령별 설명 생성 서비스
         wordDescriptionService = mock(WordDescriptionService.class);
+        badWordFilterService = mock(BadWordFilterService.class);
 
         when(transactionTemplate.execute(any()))
                 .thenAnswer(invocation ->
@@ -73,7 +77,8 @@ class QuestionConfirmServiceTest {
                 candidateTtsService,
                 s3Service,
                 transactionTemplate,
-                wordDescriptionService
+                wordDescriptionService,
+                badWordFilterService
         );
     }
 
@@ -260,9 +265,14 @@ class QuestionConfirmServiceTest {
     @Test
     void confirmWordSavesQuestionHistory() {
         QuestionSession session =
-                QuestionSession.create(1L, "적금이 뭐야", null);
+                QuestionSession.create(1L, "저끔이 뭐야", null);
 
-        session.setExtractionResult("적금", List.of("적금"));
+        session.setExtractionResult(
+                "저끔이",
+                List.of("저끔이", "저끔")
+        );
+
+        session.updateTargetPronunciation("저끔");
 
         session.setFirstCandidates(List.of(new WordCandidate(
                 "CURATED:적금",
@@ -301,8 +311,75 @@ class QuestionConfirmServiceTest {
                 .isEqualTo(QuestionSessionStatus.CONFIRMED);
         assertThat(response.imageUrl()).isEqualTo("https://image.example/10.png");
 
+        ArgumentCaptor<QuestionHistory> captor =
+                ArgumentCaptor.forClass(QuestionHistory.class);
+
         verify(questionHistoryRepository)
-                .save(any());
+                .save(captor.capture());
+
+        assertThat(captor.getValue().getRecognizedText())
+                .isEqualTo("저끔");
+    }
+
+    @Test
+    void confirmWordRejectsBlockedExternalDefinition() {
+        QuestionSession session =
+                QuestionSession.create(1L, "자외선이 뭐야?", null);
+
+        session.setExtractionResult(
+                "자외선",
+                List.of("자외선")
+        );
+
+        session.setFirstCandidates(List.of(new WordCandidate(
+                "EXTERNAL:자외선",
+                null,
+                "자외선",
+                WordSourceType.EXTERNAL,
+                1.0,
+                0.0,
+                1.0,
+                "금칙어가 포함된 정의",
+                null,
+                null,
+                null,
+                null
+        )));
+
+        when(sessionStore.find(session.getSessionId()))
+                .thenReturn(Optional.of(session));
+
+        when(sessionStore.isCurrent(session))
+                .thenReturn(true);
+
+        stubChildOwnership(1L, 1L);
+
+        when(wordRepository.findByWord("자외선"))
+                .thenReturn(Optional.empty());
+
+        when(badWordFilterService.containsBlockedText(
+                "금칙어가 포함된 정의"
+        )).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                questionConfirmService.confirmWord(
+                        1L,
+                        session.getSessionId().toString(),
+                        "c_001",
+                        null
+                )
+        )
+                .isInstanceOf(CustomException.class)
+                .extracting(ex ->
+                        ((CustomException) ex).getErrorCode())
+                .isEqualTo(QuestionErrorCode.BAD_WORD_DETECTED);
+
+        verify(wordRepository, never()).save(any());
+        verify(questionHistoryRepository, never()).save(any());
+        verifyNoInteractions(s3Service);
+
+        assertThat(session.getStatus())
+                .isEqualTo(QuestionSessionStatus.FIRST_CANDIDATES_READY);
     }
 
     private void stubChildOwnership(Long userId, Long childId) {

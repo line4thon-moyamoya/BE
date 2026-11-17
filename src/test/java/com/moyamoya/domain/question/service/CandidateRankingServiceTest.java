@@ -2,12 +2,15 @@ package com.moyamoya.domain.question.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.moyamoya.domain.question.config.QuestionDataLoader;
+import com.moyamoya.domain.question.model.QuestionWordData;
 import com.moyamoya.domain.question.model.WordCandidate;
 import com.moyamoya.domain.word.entity.HeardFrom;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CandidateRankingServiceTest {
 
     private CandidateRankingService rankingService;
+    private BadWordFilterService badWordFilterService;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -22,12 +26,16 @@ class CandidateRankingServiceTest {
                 new QuestionDataLoader(new ObjectMapper());
 
         loader.load();
+        badWordFilterService = Mockito.mock(BadWordFilterService.class);
+        Mockito.when(badWordFilterService.containsBlockedText(Mockito.any()))
+                .thenReturn(false);
 
         rankingService = new CandidateRankingService(
                 loader,
                 new PronunciationSimilarity(),
                 new PronunciationVariantGenerator(loader),
-                new ContextScoringService()
+                new ContextScoringService(),
+                badWordFilterService
         );
     }
 
@@ -79,12 +87,20 @@ class CandidateRankingServiceTest {
     }
 
     @Test
-    void originalExpressionShouldBePreservedWhenItIsAWord() {
-        assertThat(
-                rankingService.resolveTargetPronunciation(
-                        List.of("세금", "세")
-                )
-        ).contains("세금");
+    void calculateSecondPassScoreUsesAvailableSignals() {
+        double withAllSignals = rankingService.calculateSecondPassScore(
+                0.8,
+                0.6,
+                0.4
+        );
+        double withPronunciationOnly = rankingService.calculateSecondPassScore(
+                0.8,
+                null,
+                null
+        );
+
+        assertThat(withAllSignals).isGreaterThan(0.0).isLessThanOrEqualTo(1.0);
+        assertThat(withPronunciationOnly).isEqualTo(0.8);
     }
 
     @Test
@@ -99,5 +115,90 @@ class CandidateRankingServiceTest {
         assertThat(candidates)
                 .extracting(WordCandidate::candidateId)
                 .doesNotContain("CURATED:세금", "CURATED:소금", "CURATED:선거");
+    }
+
+    @Test
+    void blockedCandidateShouldBeExcluded() {
+        Mockito.when(
+                badWordFilterService.containsBlockedText("세금")
+        ).thenReturn(true);
+
+        List<WordCandidate> candidates =
+                rankingService.rankFirst(List.of("세금"));
+
+        assertThat(candidates)
+                .extracting(WordCandidate::word)
+                .doesNotContain("세금");
+    }
+
+    @Test
+    void externalWordShouldUsePronunciationRules() {
+        double score =
+                rankingService.calculateExternalPronunciationScore(
+                        List.of("토장"),
+                        "통장",
+                        true
+                );
+
+        assertThat(score).isGreaterThanOrEqualTo(0.85);
+    }
+
+    @Test
+    void secondPassShouldSupportCompoundPronunciation() {
+        double firstScore =
+                rankingService.calculateExternalPronunciationScore(
+                        List.of("보이더"),
+                        "보일러",
+                        true
+                );
+
+        double secondScore =
+                rankingService.calculateExternalPronunciationScore(
+                        List.of("보이더"),
+                        "보일러",
+                        false
+                );
+
+        assertThat(secondScore)
+                .isGreaterThan(firstScore);
+    }
+
+    @Test
+    void curatedCsvDataShouldUseCsvPronunciationFields() {
+        Optional<QuestionWordData> csvData = rankingService.getWords().stream()
+                .filter(data -> "적금".equals(data.word()))
+                .findFirst();
+
+        assertThat(csvData).isPresent();
+
+        double withCsvData = rankingService.calculateExternalPronunciationScore(
+                List.of("저끔"),
+                csvData.get(),
+                true
+        );
+
+        double withWordOnly = rankingService.calculateExternalPronunciationScore(
+                List.of("저끔"),
+                "적금",
+                true
+        );
+
+        assertThat(withCsvData).isGreaterThanOrEqualTo(withWordOnly);
+    }
+
+    @Test
+    void zeroContextScoreShouldNotBeTreatedAsMissing() {
+        double missingContext =
+                rankingService.calculateSecondPassScore(
+                        0.8, null, null
+                );
+
+        double zeroContext =
+                rankingService.calculateSecondPassScore(
+                        0.8, 0.0, null
+                );
+
+        assertThat(missingContext).isEqualTo(0.8);
+        assertThat(zeroContext).isLessThan(missingContext);
     }
 }
