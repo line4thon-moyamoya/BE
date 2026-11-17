@@ -12,7 +12,6 @@ import java.util.Locale;
 public class BadWordFilterService {
 
     private final QuestionDataLoader dataLoader;
-    private final CandidateRankingService rankingService;
 
     public boolean isBlockedWord(String word) {
         String normalized = normalize(word);
@@ -49,7 +48,7 @@ public class BadWordFilterService {
             }
 
             // 검수된 정상 단어는 부분 일치 검사 제외
-            if (rankingService.containsCsvWord(token)) {
+            if (containsCsvWord(token)) {
                 continue;
             }
 
@@ -78,5 +77,16 @@ public class BadWordFilterService {
                 )
                 .toLowerCase(Locale.ROOT)
                 .trim();
+    }
+
+    private boolean containsCsvWord(String word) {
+        if (word == null || word.isBlank()) {
+            return false;
+        }
+
+        return dataLoader.getWords().stream()
+                .anyMatch(data ->
+                        data.word().equalsIgnoreCase(word.trim())
+                );
     }
 }
