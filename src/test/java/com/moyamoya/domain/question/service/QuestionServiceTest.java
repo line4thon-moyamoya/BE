@@ -33,6 +33,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 
 class QuestionServiceTest {
 
@@ -91,6 +92,12 @@ class QuestionServiceTest {
 
         when(moyaTtsService.synthesize(any()))
                 .thenReturn(new byte[]{1, 2, 3});
+
+        when(targetPronunciationResolver.resolve(
+                any(),
+                any(),
+                anyBoolean()
+        )).thenReturn(Optional.empty());
     }
 
     @Test
@@ -114,8 +121,6 @@ class QuestionServiceTest {
                         null,
                         null
                 )));
-        when(targetPronunciationResolver.resolve(any(), any()))
-                .thenReturn(Optional.empty());
         stubChildOwnership(1L, 1L);
 
         Word word = mock(Word.class);
@@ -152,6 +157,7 @@ class QuestionServiceTest {
 
     @Test
     void testSttThrowsBadWordDetectedWhenSentenceContainsBlockedText() {
+        stubChildOwnership(1L, 1L);
         when(badWordFilterService.containsBlockedText("금칙어 포함 질문"))
                 .thenReturn(true);
 
@@ -163,6 +169,7 @@ class QuestionServiceTest {
 
     @Test
     void testSttThrowsBadWordDetectedWhenJosaExpressionContainsBlockedText() {
+        stubChildOwnership(1L, 1L);
         when(targetExtractor.extract("엄마, 데금이가 뭐야?"))
                 .thenReturn(QuestionExtractionResult.success("엄마, 데금이가 뭐야?", "데금이가"));
         when(josaGenerator.generate("데금이가"))
@@ -326,8 +333,6 @@ class QuestionServiceTest {
                         null,
                         null
                 )));
-        when(targetPronunciationResolver.resolve(any(), any()))
-                .thenReturn(Optional.empty());
         stubChildOwnership(1L, 1L);
         when(wordRepository.findByWord("세금")).thenReturn(Optional.empty());
         when(moyaTtsService.synthesize(any()))

@@ -19,6 +19,7 @@ public class CandidateRankingService {
     private final PronunciationSimilarity similarity;
     private final PronunciationVariantGenerator variantGenerator;
     private final ContextScoringService contextScoringService;
+    private final BadWordFilterService badWordFilterService;
 
     // 초기 실험값 (테스트 후 조정)
     private static final double MIN_SCORE = 0.60;
@@ -96,6 +97,13 @@ public class CandidateRankingService {
 
         for (QuestionWordData data : dataLoader.getWords()) {
             if (data.word() == null || data.word().isBlank()) {
+                continue;
+            }
+
+            if (badWordFilterService.containsBlockedText(data.word())
+                    || badWordFilterService.containsBlockedText(
+                    data.definition()
+            )) {
                 continue;
             }
 
@@ -200,9 +208,28 @@ public class CandidateRankingService {
                 continue;
             }
 
-            String candidateKey = "CURATED:" + data.word();
+            if (badWordFilterService.containsBlockedText(data.word())
+                    || badWordFilterService.containsBlockedText(
+                    data.definition()
+            )) {
+                continue;
+            }
 
-            if (excluded.contains(candidateKey)) {
+            String wordKey = data.word()
+                    .trim()
+                    .toLowerCase(Locale.ROOT);
+
+            boolean alreadyShown = excluded.stream()
+                    .filter(Objects::nonNull)
+                    .map(value ->
+                            value.trim().toLowerCase(Locale.ROOT)
+                    )
+                    .anyMatch(value ->
+                            value.equals(wordKey)
+                                    || value.endsWith(":" + wordKey)
+                    );
+
+            if (alreadyShown) {
                 continue;
             }
 

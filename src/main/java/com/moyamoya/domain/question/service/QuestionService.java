@@ -27,10 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
-import java.util.Base64;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -158,9 +155,18 @@ public class QuestionService {
             );
 
             // F2에서 발견한 후보까지 활용하여 발음 재판단
-            targetPronunciationResolver
-                    .resolve(session.getTargetExpressions(), candidates)
-                    .ifPresent(session::updateTargetPronunciation);
+            if (Objects.equals(
+                    session.getTargetPronunciation(),
+                    session.getRecognizedText()
+            )) {
+                targetPronunciationResolver
+                        .resolve(
+                                session.getTargetExpressions(),
+                                candidates,
+                                false
+                        )
+                        .ifPresent(session::updateTargetPronunciation);
+            }
 
             List<WordCandidate> enrichedCandidates =
                     enrichCandidatesWithWordData(
@@ -278,7 +284,7 @@ public class QuestionService {
 
         // 탐색 결과를 활용하여 기록할 발음 결정
         targetPronunciationResolver
-                .resolve(expressions, candidates)
+                .resolve(expressions, candidates, true)
                 .ifPresent(session::updateTargetPronunciation);
 
         List<WordCandidate> enrichedCandidates =

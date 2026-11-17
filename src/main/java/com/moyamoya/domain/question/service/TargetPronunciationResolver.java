@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -14,80 +15,126 @@ public class TargetPronunciationResolver {
 
     private final CandidateRankingService rankingService;
     private final WordRepository wordRepository;
-    private final ExternalDictionaryService dictionaryService;
 
     private static final double MIN_PRONUNCIATION_SCORE = 0.85;
     private static final double MIN_SCORE_GAP = 0.12;
 
+    // 기존 호출부 호환
     public Optional<String> resolve(
             List<String> expressions,
             List<WordCandidate> candidates
+    ) {
+        return resolve(expressions, candidates, true);
+    }
+
+    public Optional<String> resolve(
+            List<String> expressions,
+            List<WordCandidate> candidates,
+            boolean isFirstPass
     ) {
         if (expressions == null || expressions.isEmpty()) {
             return Optional.empty();
         }
 
-        String original = expressions.getFirst();
+        List<String> normalizedExpressions =
+                expressions.stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(expression ->
+                                !expression.isBlank()
+                        )
+                        .distinct()
+                        .toList();
 
-        if (expressions.size() == 1) {
+        if (normalizedExpressions.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String original = normalizedExpressions.getFirst();
+
+        if (normalizedExpressions.size() == 1) {
             return Optional.of(original);
         }
 
-        // 원본이 정상적인 단어이면 조사 제거하지 않음
-        if (isKnownWord(original)) {
+        List<WordCandidate> validCandidates =
+                candidates == null
+                        ? List.of()
+                        : candidates.stream()
+                          .filter(Objects::nonNull)
+                          .toList();
+
+        // 1. 원본이 실제 단어이면 원본 유지
+        if (isKnownWord(original, validCandidates)) {
             return Optional.of(original);
         }
 
-        List<String> verified = expressions.stream()
-                .skip(1)
-                .filter(this::isKnownWord)
-                .distinct()
-                .toList();
+        // 2. 조사 제거형 중 정확 일치 단어 확인
+        List<String> verified =
+                normalizedExpressions.stream()
+                        .skip(1)
+                        .filter(expression ->
+                                isKnownWord(
+                                        expression,
+                                        validCandidates
+                                )
+                        )
+                        .toList();
 
-        // 정확 일치 조사 제거형이 하나인 경우
         if (verified.size() == 1) {
             return Optional.of(verified.getFirst());
         }
 
-        // 여러 형태가 실제 단어이면 원본 유지
         if (verified.size() > 1) {
             return Optional.of(original);
         }
 
-        // 정확 일치가 없으면 실제 탐색 후보와 비교
-        if (candidates == null || candidates.isEmpty()) {
+        // 3. 비교할 후보가 없다면 원본 유지
+        if (validCandidates.isEmpty()) {
             return Optional.of(original);
         }
 
         String bestExpression = original;
+
         double originalScore = calculateBestScore(
-                original, candidates
+                original,
+                validCandidates,
+                isFirstPass
         );
 
         double bestScore = originalScore;
         double runnerUpScore = originalScore;
 
-        for (String expression : expressions.stream()
-                .skip(1).toList()) {
+        // 4. 원본 및 조사 제거형의 발음 점수 비교
+        for (String expression : normalizedExpressions.stream()
+                .skip(1)
+                .toList()) {
 
             double score = calculateBestScore(
-                    expression, candidates
+                    expression,
+                    validCandidates,
+                    isFirstPass
             );
 
             if (score > bestScore) {
+
                 runnerUpScore = bestScore;
                 bestScore = score;
                 bestExpression = expression;
+
             } else {
+
                 runnerUpScore = Math.max(
-                        runnerUpScore, score
+                        runnerUpScore,
+                        score
                 );
             }
         }
 
+        // 5. 충분히 확실할 때만 조사 제거
         if (!bestExpression.equals(original)
                 && bestScore >= MIN_PRONUNCIATION_SCORE
                 && bestScore - runnerUpScore >= MIN_SCORE_GAP) {
+
             return Optional.of(bestExpression);
         }
 
@@ -96,31 +143,37 @@ public class TargetPronunciationResolver {
 
     private double calculateBestScore(
             String expression,
-            List<WordCandidate> candidates
+            List<WordCandidate> candidates,
+            boolean isFirstPass
     ) {
         return candidates.stream()
                 .mapToDouble(candidate ->
                         rankingService
                                 .calculateExternalPronunciationScore(
                                         List.of(expression),
-                                        candidate.word()
+                                        candidate.word(),
+                                        isFirstPass
                                 )
                 )
                 .max()
                 .orElse(0.0);
     }
 
-    private boolean isKnownWord(String expression) {
-
+    private boolean isKnownWord(
+            String expression,
+            List<WordCandidate> candidates
+    ) {
+        // CSV 및 기존 DB 단어 확인
         if (rankingService.containsCsvWord(expression)
                 || wordRepository.existsByWord(expression)) {
+
             return true;
         }
 
-        return dictionaryService.searchExactMatches(expression)
-                .stream()
-                .anyMatch(entry ->
-                        expression.equals(entry.word())
-                );
+        // 이번 후보 탐색에서 검증된 신규 사전 단어 확인
+        return candidates.stream()
+                .map(WordCandidate::word)
+                .filter(Objects::nonNull)
+                .anyMatch(expression::equals);
     }
 }

@@ -92,10 +92,14 @@ public class PronunciationVariantGenerator {
         queries.add(original);
 
         List<PronunciationVariant> reverseVariants =
-                generateReverseDetailed(original);
+                diversifyVariants(
+                        generateReverseDetailed(original)
+                );
 
         List<PronunciationVariant> forwardVariants =
-                generateDetailed(original);
+                diversifyVariants(
+                        generateDetailed(original)
+                );
 
         // F1은 단일 변환 중심
         int reverseLimit = isFirstPass
@@ -386,6 +390,7 @@ public class PronunciationVariantGenerator {
     }
 
     // 복합 역방향 변환, 최대 두 번 규칙 허용(무한히 재귀적으로 변형하지 않도록 제한)
+    // 12개의 기본 역방향 변형에 대해 복합 규칙을 평가 => 중복 제거와 분산 정렬 => 최대 40개 제한
     private List<PronunciationVariant> generateCombinedReverseVariants(
             String original,
             List<PronunciationVariant> firstVariants
@@ -393,20 +398,28 @@ public class PronunciationVariantGenerator {
         Map<String, PronunciationVariant> results =
                 new LinkedHashMap<>();
 
-        Set<String> visited = new HashSet<>();
-        visited.add(original);
+        Set<String> singleVariantWords =
+                new HashSet<>();
+
+        singleVariantWords.add(original);
 
         firstVariants.stream()
                 .map(PronunciationVariant::pronunciation)
-                .forEach(visited::add);
+                .forEach(singleVariantWords::add);
 
-        for (PronunciationVariant first : firstVariants.stream()
-                .limit(12)
-                .toList()) {
+        List<PronunciationVariant> baseVariants =
+                diversifyVariants(firstVariants)
+                        .stream()
+                        .limit(12)
+                        .toList();
+
+        for (PronunciationVariant first : baseVariants) {
 
             List<PronunciationVariant> secondVariants =
-                    generateReverseDetailed(
-                            first.pronunciation()
+                    diversifyVariants(
+                            generateReverseDetailed(
+                                    first.pronunciation()
+                            )
                     );
 
             for (PronunciationVariant second : secondVariants) {
@@ -414,41 +427,42 @@ public class PronunciationVariantGenerator {
                 String pronunciation =
                         second.pronunciation();
 
-                if (!visited.add(pronunciation)) {
+                // 원본 및 단일 변형과 중복되는 결과 제외
+                if (singleVariantWords.contains(pronunciation)) {
                     continue;
                 }
 
-                // 복합 규칙은 두 규칙 중 낮은 우선순위 적용
                 String priority =
                         priorityRank(first.priority())
                                 <= priorityRank(second.priority())
                                 ? first.priority()
                                 : second.priority();
 
-                results.put(
-                        pronunciation,
+                PronunciationVariant combined =
                         new PronunciationVariant(
                                 pronunciation,
-                                first.ruleId() + "+" + second.ruleId(),
+                                first.ruleId()
+                                        + "+"
+                                        + second.ruleId(),
                                 priority
-                        )
+                        );
+
+                results.merge(
+                        pronunciation,
+                        combined,
+                        (previous, current) ->
+                                priorityRank(current.priority())
+                                        > priorityRank(previous.priority())
+                                        ? current
+                                        : previous
                 );
-
-                if (results.size() >= F2_EXPANSION_LIMIT) {
-                    break;
-                }
-            }
-
-            if (results.size() >= F2_EXPANSION_LIMIT) {
-                break;
             }
         }
 
-        return results.values().stream()
-                .sorted(Comparator.comparingInt(
-                        (PronunciationVariant variant) ->
-                                priorityRank(variant.priority())
-                ).reversed())
+        return diversifyVariants(
+                new ArrayList<>(results.values())
+        ).stream()
+                .limit(F2_EXPANSION_LIMIT)
                 .toList();
     }
 
@@ -808,6 +822,48 @@ public class PronunciationVariantGenerator {
         }
 
         return values;
+    }
+
+    // 규칙별 분산 정렬
+    private List<PronunciationVariant> diversifyVariants(
+            List<PronunciationVariant> variants
+    ) {
+        Map<String, List<PronunciationVariant>> grouped =
+                new LinkedHashMap<>();
+
+        variants.stream()
+                .sorted(
+                        Comparator.comparingInt(
+                                (PronunciationVariant variant) ->
+                                        priorityRank(variant.priority())
+                        ).reversed()
+                )
+                .forEach(variant ->
+                        grouped.computeIfAbsent(
+                                variant.ruleId(),
+                                key -> new ArrayList<>()
+                        ).add(variant)
+                );
+
+        List<PronunciationVariant> result =
+                new ArrayList<>();
+
+        int maxSize = grouped.values().stream()
+                .mapToInt(List::size)
+                .max()
+                .orElse(0);
+
+        for (int i = 0; i < maxSize; i++) {
+            for (List<PronunciationVariant> group
+                    : grouped.values()) {
+
+                if (i < group.size()) {
+                    result.add(group.get(i));
+                }
+            }
+        }
+
+        return result;
     }
 }
 
