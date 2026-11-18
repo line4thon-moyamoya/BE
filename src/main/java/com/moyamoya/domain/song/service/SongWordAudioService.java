@@ -56,6 +56,7 @@ public class SongWordAudioService {
     private byte[] create(String text, Word word, Map<String, SongTtsService.Result> syllables) {
         String previous = word == null ? null : word.getSongAudioUrl();
         var plan = planner.planWord(text);
+        String speechText = SongSpeechPlanner.speechText(text);
         var pending = new LinkedHashMap<String, Future<SongTtsService.Result>>();
         try {
             for (var speech : plan) {
@@ -101,7 +102,7 @@ public class SongWordAudioService {
                 voices.add(voice.audio());
             }
             double next = index + 1 < plan.size() ? plan.get(index + 1).startSec() : SongSpeechPlanner.WORD_SLOT_SECONDS;
-            Double available = text.codePointCount(0, text.length()) >= 6 ? null
+            Double available = speechText.codePointCount(0, speechText.length()) >= 6 ? null
                     : Math.rint((next - speech.startSec()) * 1000) / 1000;
             placements.add(new SongAudioPlacement(audioIndex, speech.startSec(), available));
         }

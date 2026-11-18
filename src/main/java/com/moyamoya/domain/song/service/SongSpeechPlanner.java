@@ -3,6 +3,7 @@ package com.moyamoya.domain.song.service;
 import com.moyamoya.domain.song.model.SongSpeechPlacement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -22,7 +23,7 @@ public class SongSpeechPlanner {
     }
 
     public List<SongSpeechPlacement> planWord(String word) {
-        word = normalize(word);
+        word = speechText(word);
         var placements = new ArrayList<SongSpeechPlacement>();
         List<String> syllables = word.codePoints().mapToObj(Character::toString).toList();
         double[] offsets = switch (syllables.size()) {
@@ -39,7 +40,17 @@ public class SongSpeechPlanner {
         return List.copyOf(placements);
     }
 
-    private String normalize(String word) {
+    static String speechText(String word) {
+        String text = normalize(word).codePoints()
+                .filter(codePoint -> !Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint))
+                .mapToObj(Character::toString).collect(Collectors.joining());
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("노래 발음에 사용할 글자가 필요합니다.");
+        }
+        return text;
+    }
+
+    private static String normalize(String word) {
         if (word == null || word.isBlank() || word.length() > 100) {
             throw new IllegalArgumentException("단어는 1~100자여야 합니다.");
         }
