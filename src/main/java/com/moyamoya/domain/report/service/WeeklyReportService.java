@@ -62,6 +62,12 @@ public class WeeklyReportService {
                 weekStartDate,
                 snapshotAt
         );
+
+        // 질문 기록이 없는 주차는 리포트 생성하지 않음
+        if (snapshot.questionCount() == 0) {
+            return;
+        }
+
         WeeklyReportSnapshot snapshotWithTopic = applyConversationTopic(
                 child,
                 snapshot
