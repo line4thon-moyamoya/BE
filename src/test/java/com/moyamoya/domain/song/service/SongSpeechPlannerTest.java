@@ -58,6 +58,11 @@ class SongSpeechPlannerTest {
 
     @Test
     void excludesUnicodeWhitespaceFromSpeechAndRejectsWhitespaceOnlyText() {
+        assertThat(planner.planWord("정기\u0085검진"))
+                .isEqualTo(planner.planWord("정기검진"));
+        assertThat(planner.plan(List.of("정기\u0085검진", "가", "나", "다", "라")).getFirst().text())
+                .isEqualTo("정기\u0085검진");
+        assertThatIllegalArgumentException().isThrownBy(() -> planner.planWord("\u0085"));
         assertThat(planner.planWord("정\t기\u00a0검\u3000진"))
                 .isEqualTo(planner.planWord("정기검진"));
         assertThatIllegalArgumentException().isThrownBy(() -> planner.planWord("\u00a0\u3000"));

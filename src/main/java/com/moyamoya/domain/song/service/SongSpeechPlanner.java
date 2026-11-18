@@ -42,7 +42,8 @@ public class SongSpeechPlanner {
 
     static String speechText(String word) {
         String text = normalize(word).codePoints()
-                .filter(codePoint -> !Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint))
+                .filter(codePoint -> codePoint != 0x0085
+                        && !Character.isWhitespace(codePoint) && !Character.isSpaceChar(codePoint))
                 .mapToObj(Character::toString).collect(Collectors.joining());
         if (text.isEmpty()) {
             throw new IllegalArgumentException("노래 발음에 사용할 글자가 필요합니다.");
