@@ -18,6 +18,9 @@ class SongSpeechPlannerTest {
             "적금|적,금,적,금|0.0,0.5,0.99,1.49",
             "소방차|소,방,차|0.0,0.5,0.99",
             "국회의원|국,회,의,원|0.0,0.5,0.99,1.49",
+            "정기 검진|정,기,검,진|0.0,0.5,0.99,1.49",
+            "정 기 검 진|정,기,검,진|0.0,0.5,0.99,1.49",
+            "어린이 도서관|어린이도서관|0.0",
             "예방접종표|예,방,접,종,표|0.0,0.25,0.5,0.74,0.99",
             "어린이도서관|어린이도서관|0.0"
     }, delimiter = '|')
@@ -45,5 +48,23 @@ class SongSpeechPlannerTest {
             assertThatIllegalArgumentException().isThrownBy(
                     () -> planner.plan(Arrays.asList("가", "나", "다", "라", invalid)));
         }
+    }
+
+    @Test
+    void preservesInternalWhitespaceInWordLookupPlan() {
+        var result = planner.plan(List.of("정기 검진", "가", "나", "다", "라"));
+        assertThat(result.getFirst().text()).isEqualTo("정기 검진");
+    }
+
+    @Test
+    void excludesUnicodeWhitespaceFromSpeechAndRejectsWhitespaceOnlyText() {
+        assertThat(planner.planWord("정기\u0085검진"))
+                .isEqualTo(planner.planWord("정기검진"));
+        assertThat(planner.plan(List.of("정기\u0085검진", "가", "나", "다", "라")).getFirst().text())
+                .isEqualTo("정기\u0085검진");
+        assertThatIllegalArgumentException().isThrownBy(() -> planner.planWord("\u0085"));
+        assertThat(planner.planWord("정\t기\u00a0검\u3000진"))
+                .isEqualTo(planner.planWord("정기검진"));
+        assertThatIllegalArgumentException().isThrownBy(() -> planner.planWord("\u00a0\u3000"));
     }
 }
