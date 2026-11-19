@@ -232,6 +232,26 @@ class SongWordAudioServiceTest {
     }
 
     @Test
+    void excludesWhitespaceFromSpeechButPreservesRegisteredWordWhenSaving() {
+        generatedAudio();
+        when(words.findByWord("정 기 검 진")).thenReturn(Optional.of(word));
+        when(storage.uploadWord(7L, "정 기 검 진", clip)).thenReturn("saved");
+        when(words.replaceAudioKey(7L, "정 기 검 진", null, "saved")).thenReturn(1);
+        service.getOrCreate("정 기 검 진", new LinkedHashMap<>());
+        verify(tts).synthesize("정");
+        verify(tts).synthesize("기");
+        verify(tts).synthesize("검");
+        verify(tts).synthesize("진");
+        verifyNoMoreInteractions(tts);
+        verify(mixer).composeWord(anyList(), eq(List.of(
+                new SongAudioPlacement(0, 0, 0.5), new SongAudioPlacement(1, 0.5, 0.49),
+                new SongAudioPlacement(2, 0.99, 0.5), new SongAudioPlacement(3, 1.49, 2.51))));
+        verify(storage).uploadWord(7L, "정 기 검 진", clip);
+        verify(words).replaceAudioKey(7L, "정 기 검 진", null, "saved");
+        verify(storage, never()).deleteWord(any());
+    }
+
+    @Test
     void generatesTwoSyllablesConcurrentlyAndPreservesOrderWhenSecondFinishesFirst() throws Exception {
         generatedAudio();
         byte[] firstAudio = {3};
